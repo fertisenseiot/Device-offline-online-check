@@ -8,10 +8,10 @@ import json, os
 
 # ================== CONFIG ==================
 db_config = {
-    "host": "switchback.proxy.rlwy.net",
+    "host": "switchyard.proxy.rlwy.net",
     "user": "root",
-    "port": 44750,
-    "password": "qYxlhEiaEvtiRvKaFyigDPtXSSCpddMv",
+    "port": 28085,
+    "password": "NOtYUNawwodSrBfGubHhwKaFtWyGXQct",
     "database": "railway",
 }
 
