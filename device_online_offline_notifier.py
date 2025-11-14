@@ -109,7 +109,7 @@ def get_contact_info(device_id):
             JOIN Master_Subscription_Info msi
               ON sh.Subscription_ID = msi.Subscription_ID
             WHERE sh.Device_ID=%s
-              AND sh.Subscription_ID=8
+              AND sh.Subscription_ID=1
               AND sh.Subcription_End_date >= %s
         """, (device_id, today))
         subscription = cursor.fetchone()
