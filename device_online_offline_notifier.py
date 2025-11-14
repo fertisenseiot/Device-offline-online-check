@@ -5,6 +5,11 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 import json, os
+import pytz 
+
+os.environ['TZ'] = 'Asia/Kolkata'
+t.tzset()
+
 
 # ================== CONFIG ==================
 db_config = {
