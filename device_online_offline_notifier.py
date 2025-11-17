@@ -10,13 +10,12 @@ import pytz
 os.environ['TZ'] = 'Asia/Kolkata'
 t.tzset()
 
-
 # ================== CONFIG ==================
 db_config = {
-    "host": "switchyard.proxy.rlwy.net",
+    "host": "switchback.proxy.rlwy.net",
     "user": "root",
-    "port": 28085,
-    "password": "NOtYUNawwodSrBfGubHhwKaFtWyGXQct",
+    "port": 44750,
+    "password": "qYxlhEiaEvtiRvKaFyigDPtXSSCpddMv",
     "database": "railway",
 }
 
@@ -30,7 +29,7 @@ SMTP_PORT = 587
 EMAIL_USER = "testwebservice71@gmail.com"
 EMAIL_PASS = "akuu vulg ejlg ysbt"
 
-OFFLINE_THRESHOLD = 5          # minutes
+# OFFLINE_THRESHOLD = 5          # minutes
 OFFLINE_VERIFY_MINUTES = 3     # wait before confirming offline
 SECOND_NOTIFICATION_HOURS = 6  # wait 6 hours before re-alert
 
@@ -114,7 +113,7 @@ def get_contact_info(device_id):
             JOIN Master_Subscription_Info msi
               ON sh.Subscription_ID = msi.Subscription_ID
             WHERE sh.Device_ID=%s
-              AND sh.Subscription_ID=1
+              AND sh.Subscription_ID=8
               AND sh.Subcription_End_date >= %s
         """, (device_id, today))
         subscription = cursor.fetchone()
@@ -210,7 +209,9 @@ def check_device_online_status():
                 last_update = datetime.combine(last_read["READING_DATE"], reading_time)
                 diff_minutes = (now - last_update).total_seconds() / 60
 
-            current_state = 0 if (diff_minutes is None or diff_minutes > OFFLINE_THRESHOLD) else 1
+            # Device offline only if NO reading found
+            current_state = 0 if diff_minutes is None else 1
+
 
             # Verify offline devices again
             if current_state == 0:
@@ -232,10 +233,11 @@ def check_device_online_status():
                             reading_time = dt_time(int(total_sec // 3600), int((total_sec % 3600) // 60), int(total_sec % 60))
                         last_update_check = datetime.combine(last_check["READING_DATE"], reading_time)
                         diff_check = (datetime.now() - last_update_check).total_seconds() / 60
-                        if diff_check <= OFFLINE_THRESHOLD:
-                            print(f"✅ {devnm} came back online within {OFFLINE_VERIFY_MINUTES} minutes.")
-                            current_state = 1
-                            break
+                        if last_check:
+                         print(f"✅ {devnm} came back online during verification.")
+                         current_state = 1
+                        break
+
                     t.sleep(30)
 
             # ---------------- Notification Logic ----------------
