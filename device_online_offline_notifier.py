@@ -15,12 +15,11 @@ EMAIL_USER = "testwebservice71@gmail.com"
 EMAIL_PASS = "akuu vulg ejlg ysbt"
 # ================== CONFIG ==================
 db_config = {
-    "host": "switchback.proxy.rlwy.net",
+    "host": "switchyard.proxy.rlwy.net",
     "user": "root",
-    "port": 44750,
-    "password": "qYxlhEiaEvtiRvKaFyigDPtXSSCpddMv",
+    "port": 28085,
+    "password": "NOtYUNawwodSrBfGubHhwKaFtWyGXQct",
     "database": "railway",
-    "raise_on_warnings": True,
 }
 
 SMS_API_URL = "https://www.universalsmsadvertising.com/universalsmsapi.php"
