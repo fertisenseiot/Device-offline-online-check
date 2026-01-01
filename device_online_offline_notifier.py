@@ -566,7 +566,10 @@ def check_device_online_status():
                     # make timezone aware (important)
                 if sms_last_dt.tzinfo is None:
                    sms_last_dt = IST_PYTZ.localize(sms_last_dt)
-
+                  # FIX HERE
+                  # make timezone aware (important)
+                if sms_last_dt.tzinfo is None:
+                   sms_last_dt = IST_PYTZ.localize(sms_last_dt)
                     print("sms_last_date",sms_last_dt)
                 elif sms_date and not sms_time_parsed:
                     # if only date present, use midnight
