@@ -1,18 +1,16 @@
 import os
 import mysql.connector
 import requests
-import smtplib
+# import smtplib
 import pytz
 import traceback
-
 from datetime import datetime, date, time as dt_time, timedelta, timezone
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-EMAIL_USER = "testwebservice71@gmail.com"
-EMAIL_PASS = "akuu vulg ejlg ysbt"
+
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+
 
 # ================== CONFIG ==================
 db_config = {
@@ -159,24 +157,33 @@ def online_html(dev_name):
 def send_email(subject, html_content, email_ids):
     if not email_ids:
         return False
+
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = EMAIL_USER
-        msg["To"] = ", ".join(email_ids)
-        msg.attach(MIMEText(html_content, "html"))
+        configuration = sib_api_v3_sdk.Configuration()
+        configuration.api_key['api-key'] = BREVO_API_KEY
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=20)
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, email_ids, msg.as_string())
-        server.quit()
+        api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+            sib_api_v3_sdk.ApiClient(configuration)
+        )
 
-        log(f"✅ Email sent to {len(email_ids)} recipients")
+        email = sib_api_v3_sdk.SendSmtpEmail(
+            subject=subject,
+            html_content=html_content,
+            sender={
+                "name": "Fertisense_Email",
+                "email": "fertisenseiot@gmail.com"  # Brevo me verified hona chahiye
+            },
+            to=[{"email": e} for e in email_ids]
+        )
+
+        api_instance.send_transac_email(email)
+        log(f"✅ Brevo email sent to {len(email_ids)} users")
         return True
-    except Exception as e:
-        log(f"❌ Email failed: {e}")
+
+    except ApiException as e:
+        log(f"❌ Brevo email failed: {e}")
         return False
+
 
 
 # ================== CONTACT FETCH ==================
@@ -209,11 +216,19 @@ def get_contact_info(device_id):
 
         for u in users:
             if u.get("SEND_SMS") == 1 and u.get("PHONE"):
-                phones.append(str(u["PHONE"]).strip())
+                raw_phone = str(u["PHONE"])
+
+            for ph in raw_phone.replace("/", ",").split(","):
+                ph = ph.strip()
+                if ph:
+                 phones.append(ph)
             if u.get("SEND_EMAIL") == 1 and u.get("EMAIL"):
                 emails.append(u["EMAIL"].strip())
 
         return list(set(phones)), list(set(emails)), org_id, centre_id
+    
+        # log(f"📞 Phones resolved: {phones}")
+
 
     except Exception as e:
         log(f"❌ Contact fetch error: {e}")
@@ -256,9 +271,17 @@ def check_device_online_status():
         )
         devices = cursor.fetchall()
 
+        log(f"📟 Active devices found: {len(devices)}")
+
+
         for d in devices:
+
             devid = d["DEVICE_ID"]
             devnm = d.get("DEVICE_NAME") or f"Device-{devid}"
+   
+            log(f"➡️ Checking device: {devnm} ({devid})")
+
+            
 
             phones, emails, _, _ = get_contact_info(devid)
 
