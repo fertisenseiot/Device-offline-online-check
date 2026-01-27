@@ -397,7 +397,7 @@ def check_device_online_status():
             alarm = cursor.fetchone()
 
             # ---------- ONLINE ----------
-            if current_state == 1 and alarm:
+            if current_state == 1 and alarm and alarm["IS_ACTIVE"] == 1:
                 message = build_message(5, devnm)
                 sms_ok = send_sms(phones, message)
                 email_ok = send_email(f"{devnm} Back Online", online_html(devnm), emails)
@@ -424,7 +424,7 @@ def check_device_online_status():
                 continue
 
             # ---------- OFFLINE ----------
-            if current_state == 0 and not alarm:
+            if current_state == 0 and (not alarm or alarm["IS_ACTIVE"] ==0):
                 message = build_message(3, devnm)
                 sms_ok = send_sms(phones, message)
                 email_ok = send_email(
