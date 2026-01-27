@@ -42,36 +42,95 @@ def log(msg):
     print(f"[{datetime.now().isoformat(sep=' ', timespec='seconds')}] {msg}")
 
 
+# ================== DLT SAFE MESSAGE BUILDER ==================
 def build_message(ntf_typ, devnm):
     messages = {
-        3: f"WARNING!! The {devnm} is offline. Please take necessary action - Regards Fertisense LLP",
-        5: f"INFO!! The device {devnm} is back online. No action is required - Regards Fertisense LLP",
+        3: f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP",
+        5: f"INFO!! The {devnm} is back online. No action is required- Regards Fertisense LLP",
     }
-    return messages.get(ntf_typ, f"Alert for {devnm} - Regards Fertisense LLP")
+    return messages.get(ntf_typ, f"Alert for {devnm}- Regards Fertisense LLP")
 
 
-# ---------------- send sms ----------------
-def send_sms(phone, message):
+# ================== DLT REJECTION DETECTOR ==================
+def detect_dlt_issue(response_text: str) -> str:
+    if not response_text:
+        return "UNKNOWN_RESPONSE"
+
+    txt = response_text.lower()
+
+    if "template" in txt:
+        return "DLT_TEMPLATE_MISMATCH"
+    if "sender" in txt:
+        return "SENDER_ID_NOT_APPROVED"
+    if "dlt" in txt:
+        return "DLT_VALIDATION_FAILED"
+    if "route" in txt:
+        return "ROUTE_NOT_ALLOWED"
+    if "pending" in txt:
+        return "DLT_PENDING_OPERATOR_APPROVAL"
+    if "invalid" in txt:
+        return "INVALID_NUMBER_OR_CONTENT"
+
+    return "UNKNOWN_GATEWAY_RESPONSE"
+
+
+# ================== SMS SENDING ==================
+def send_sms_single(phone, message):
     if not phone:
         return False
+
     try:
         params = {
             "user_name": SMS_USER,
             "user_password": SMS_PASS,
-            "mobile": phone,
+            "mobile": str(phone).strip(),
             "sender_id": SENDER_ID,
             "type": "F",
             "text": message
         }
+
         r = requests.get(SMS_API_URL, params=params, timeout=30)
-        log(f"SMS API -> {phone} status={r.status_code}")
-        return r.status_code == 200
+        reason = detect_dlt_issue(r.text)
+
+        log(
+            f"SMS -> {phone} | HTTP={r.status_code} | "
+            f"DLT_REASON={reason} | RAW='{r.text.strip()[:120]}'"
+        )
+
+        return r.status_code == 200 and reason == "UNKNOWN_GATEWAY_RESPONSE"
+
     except Exception as e:
         log(f"❌ SMS failed for {phone}: {e}")
         return False
 
 
-# ---------------- Email templates ----------------
+def send_sms(phone, message):
+    """
+    Supports:
+      - single phone number (str/int)
+      - multiple phone numbers (list/tuple/set)
+    Sends ONE API request per number (DLT-safe).
+    """
+    if not phone:
+        return False
+
+    if isinstance(phone, (str, int)):
+        phones = [str(phone)]
+    elif isinstance(phone, (list, tuple, set)):
+        phones = [str(p).strip() for p in phone if p]
+    else:
+        return False
+
+    success_any = False
+
+    for ph in phones:
+        if send_sms_single(ph, message):
+            success_any = True
+
+    return success_any
+
+
+# ================== EMAIL TEMPLATES ==================
 def offline_html(dev_name, diff_minutes=None):
     uptime_text = ""
     if diff_minutes is not None:
@@ -112,6 +171,7 @@ def send_email(subject, html_content, email_ids):
         server.login(EMAIL_USER, EMAIL_PASS)
         server.sendmail(EMAIL_USER, email_ids, msg.as_string())
         server.quit()
+
         log(f"✅ Email sent to {len(email_ids)} recipients")
         return True
     except Exception as e:
@@ -126,7 +186,10 @@ def get_contact_info(device_id):
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute("SELECT ORGANIZATION_ID, CENTRE_ID FROM iot_api_masterdevice WHERE DEVICE_ID=%s", (device_id,))
+        cursor.execute(
+            "SELECT ORGANIZATION_ID, CENTRE_ID FROM iot_api_masterdevice WHERE DEVICE_ID=%s",
+            (device_id,)
+        )
         device = cursor.fetchone()
         if not device:
             return [], [], 1, 1
@@ -140,10 +203,9 @@ def get_contact_info(device_id):
             JOIN master_user u ON l.USER_ID_id = u.USER_ID
             WHERE l.ORGANIZATION_ID_id=%s AND l.CENTRE_ID_id=%s
         """, (org_id, centre_id))
-        users = cursor.fetchall()
 
-        phones = []
-        emails = []
+        users = cursor.fetchall()
+        phones, emails = [], []
 
         for u in users:
             if u.get("SEND_SMS") == 1 and u.get("PHONE"):
@@ -174,7 +236,7 @@ def parse_reading_time(val):
         try:
             h, m, *s = map(int, val.split(":"))
             return dt_time(h, m, s[0] if s else 0)
-        except:
+        except Exception:
             return None
     return None
 
@@ -189,7 +251,9 @@ def check_device_online_status():
 
         now = datetime.now(IST_PYTZ)
 
-        cursor.execute("SELECT DEVICE_ID, DEVICE_NAME FROM iot_api_masterdevice WHERE DEVICE_STATUS=1")
+        cursor.execute(
+            "SELECT DEVICE_ID, DEVICE_NAME FROM iot_api_masterdevice WHERE DEVICE_STATUS=1"
+        )
         devices = cursor.fetchall()
 
         for d in devices:
@@ -210,60 +274,65 @@ def check_device_online_status():
             if last_read:
                 rd = last_read["READING_DATE"]
                 rt = parse_reading_time(last_read["READING_TIME"])
-                if rd and rt:
-                    last_update = datetime.combine(rd, rt).replace(tzinfo=UTC).astimezone(IST_PYTZ)
-                else:
-                    last_update = None
+                last_update = (
+                    datetime.combine(rd, rt)
+                    .replace(tzinfo=UTC)
+                    .astimezone(IST_PYTZ)
+                    if rd and rt else None
+                )
             else:
                 last_update = None
 
-            diff_minutes = (now - last_update).total_seconds() / 60 if last_update else OFFLINE_THRESHOLD + 1
+            diff_minutes = (
+                (now - last_update).total_seconds() / 60
+                if last_update else OFFLINE_THRESHOLD + 1
+            )
             current_state = 1 if diff_minutes <= OFFLINE_THRESHOLD else 0
 
             cursor.execute("""
                 SELECT * FROM device_status_alarm_log
                 WHERE DEVICE_ID=%s AND IS_ACTIVE=1
-                ORDER BY DEVICE_STATUS_ALARM_ID DESC LIMIT 1
+                ORDER BY DEVICE_STATUS_ALARM_ID DESC
+                LIMIT 1
             """, (devid,))
             alarm = cursor.fetchone()
 
             # ---------- ONLINE ----------
-            if current_state == 1:
-                if alarm:
-                    message = build_message(5, devnm)
-                    html = online_html(devnm)
+            if current_state == 1 and alarm:
+                message = build_message(5, devnm)
+                sms_ok = send_sms(phones, message)
+                email_ok = send_email(f"{devnm} Back Online", online_html(devnm), emails)
 
-                    sms_ok = any(send_sms(p, message) for p in phones)
-                    email_ok = send_email(f"{devnm} Back Online", html, emails)
-
-                    cursor.execute("""
-                        UPDATE device_status_alarm_log
-                        SET IS_ACTIVE=0,
-                            UPDATED_ON_DATE=%s,
-                            UPDATED_ON_TIME=%s,
-                            SMS_DATE=%s,
-                            SMS_TIME=%s,
-                            EMAIL_DATE=%s,
-                            EMAIL_TIME=%s
-                        WHERE DEVICE_STATUS_ALARM_ID=%s
-                    """, (
-                        now.date(), now.time(),
-                        now.date() if sms_ok else alarm["SMS_DATE"],
-                        now.time() if sms_ok else alarm["SMS_TIME"],
-                        now.date() if email_ok else alarm["EMAIL_DATE"],
-                        now.time() if email_ok else alarm["EMAIL_TIME"],
-                        alarm["DEVICE_STATUS_ALARM_ID"]
-                    ))
-                    conn.commit()
+                cursor.execute("""
+                    UPDATE device_status_alarm_log
+                    SET IS_ACTIVE=0,
+                        UPDATED_ON_DATE=%s,
+                        UPDATED_ON_TIME=%s,
+                        SMS_DATE=%s,
+                        SMS_TIME=%s,
+                        EMAIL_DATE=%s,
+                        EMAIL_TIME=%s
+                    WHERE DEVICE_STATUS_ALARM_ID=%s
+                """, (
+                    now.date(), now.time(),
+                    now.date() if sms_ok else alarm["SMS_DATE"],
+                    now.time() if sms_ok else alarm["SMS_TIME"],
+                    now.date() if email_ok else alarm["EMAIL_DATE"],
+                    now.time() if email_ok else alarm["EMAIL_TIME"],
+                    alarm["DEVICE_STATUS_ALARM_ID"]
+                ))
+                conn.commit()
                 continue
 
             # ---------- OFFLINE ----------
-            if not alarm:
+            if current_state == 0 and not alarm:
                 message = build_message(3, devnm)
-                html = offline_html(devnm, diff_minutes)
-
-                sms_ok = any(send_sms(p, message) for p in phones)
-                email_ok = send_email(f"{devnm} Offline", html, emails)
+                sms_ok = send_sms(phones, message)
+                email_ok = send_email(
+                    f"{devnm} Offline",
+                    offline_html(devnm, diff_minutes),
+                    emails
+                )
 
                 cursor.execute("""
                     INSERT INTO device_status_alarm_log
