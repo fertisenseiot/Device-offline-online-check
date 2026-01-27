@@ -215,15 +215,26 @@ def get_contact_info(device_id):
         phones, emails = [], []
 
         for u in users:
-            if u.get("SEND_SMS") == 1 and u.get("PHONE"):
-                raw_phone = str(u["PHONE"])
 
-            for ph in raw_phone.replace("/", ",").split(","):
-                ph = ph.strip()
-                if ph:
-                 phones.append(ph)
+             # ---------- SMS PHONES ----------
+            if u.get("SEND_SMS") == 1 and u.get("PHONE"):
+               raw_phone = str(u["PHONE"])
+               for part in raw_phone.replace("/", ",").split(","):
+                   num = part.strip()
+                   if num:
+                        phones.append(num)
+
+                   # ---------- EMAILS ---------- 
+
             if u.get("SEND_EMAIL") == 1 and u.get("EMAIL"):
                 emails.append(u["EMAIL"].strip())
+
+        # duplicates hatao, order safe
+        phones = list(dict.fromkeys(phones))
+        emails = list(dict.fromkeys(emails))
+        log(f"📞 Final Phones: {phones}")
+        log(f"📧 Final Emails: {emails}")
+
 
         return list(set(phones)), list(set(emails)), org_id, centre_id
     
