@@ -359,7 +359,7 @@ def check_device_online_status():
 
             
 
-            phones, emails, _, _ = get_contact_info(devid)
+            phones, emails, _, _ = get_contact_info(cursor, devid)
 
             cursor.execute("""
                 SELECT READING_DATE, READING_TIME
