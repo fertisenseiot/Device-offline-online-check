@@ -63,19 +63,48 @@ def send_sms_single(phone, message):
             "type": "F",
             "text": message
         }
+
+        log("========== SMS DEBUG START ==========")
+        log(f"PHONE        : {phone}")
+        log(f"SENDER_ID    : {SENDER_ID}")
+        log(f"MESSAGE TEXT : {message}")
+        log(f"FULL PARAMS  : {params}")
+
         r = requests.get(SMS_API_URL, params=params, timeout=30)
+
+        log(f"HTTP STATUS  : {r.status_code}")
+        log(f"RAW RESPONSE : '{r.text.strip()}'")
+        log("=========== SMS DEBUG END ===========")
+
         log(f"SMS -> {phone} | HTTP={r.status_code}")
         return r.status_code == 200
+    
     except Exception as e:
-        log(f"❌ SMS error: {e}")
+        log("❌ SMS EXCEPTION")
+        log(str(e))
         return False
 
 
 def send_sms(phones, message):
+
+    log(f"📨 send_sms CALLED")
+    log(f"📞 Phones List : {phones}")
+    log(f"📄 Message    : {message}")
+
+    # sent = False
+    # for p in phones:
+    #     if send_sms_single(p, message):
+    #         sent = True
+    # return sent
+
     sent = False
     for p in phones:
-        if send_sms_single(p, message):
+        ok = send_sms_single(p, message)
+        log(f"➡️ Result for {p} : {ok}")
+        if ok:
             sent = True
+
+    log(f"✅ FINAL SMS RESULT : {sent}")
     return sent
 
 
@@ -209,6 +238,14 @@ def check_device_online_status():
                 """, (devid,))
                 if not cursor.fetchone():
                     log(f"🔴 OFFLINE -> {devnm}")
+                    log("===== OFFLINE DEBUG =====")
+                    log(f"DEVICE_ID  : {devid}")
+                    log(f"DEVICE_NAME: {devnm}")
+                    log(f"LAST_UPDATE: {last_update}")
+                    log(f"DIFF_MIN   : {diff}")
+                    log(f"PHONES     : {phones}")
+                    log("=========================")
+
                     sms_ok = send_sms(phones, build_message(3, devnm))
                     email_ok = send_email(
                         f"{devnm} Offline",
@@ -277,6 +314,15 @@ def check_device_online_status():
 
             if diff <= OFFLINE_THRESHOLD:
                 log(f"🟢 BACK ONLINE -> {devnm}")
+                
+                log("===== BACK ONLINE DEBUG =====")
+                log(f"DEVICE_ID  : {devid}")
+                log(f"DEVICE_NAME: {devnm}")
+                log(f"LAST_UPDATE: {last_update}")
+                log(f"DIFF_MIN   : {diff}")
+                log(f"PHONES     : {phones}")
+                log("============================")
+ 
                 sms_ok = send_sms(phones, build_message(5, devnm))
                 email_ok = send_email(
                     f"{devnm} Back Online",
