@@ -98,7 +98,7 @@ def send_sms_single(phone, message):
             f"DLT_REASON={reason} | RAW='{r.text.strip()[:120]}'"
         )
 
-        return r.status_code == 200 and reason == "UNKNOWN_GATEWAY_RESPONSE"
+        return r.status_code == 200
 
     except Exception as e:
         log(f"❌ SMS failed for {phone}: {e}")
@@ -343,7 +343,7 @@ def check_device_online_status():
         now = datetime.now(IST_PYTZ)
 
         cursor.execute(
-            "SELECT DEVICE_ID, DEVICE_NAME FROM iot_api_masterdevice WHERE DEVICE_STATUS=1"
+            "SELECT DEVICE_ID, DEVICE_NAME FROM iot_api_masterdevice"
         )
         devices = cursor.fetchall()
 
@@ -388,6 +388,11 @@ def check_device_online_status():
             )
             current_state = 1 if diff_minutes <= OFFLINE_THRESHOLD else 0
 
+            log(f"🧠 Last update: {last_update}")
+            log(f"🧠 Diff minutes: {diff_minutes}")
+            log(f"🧠 Current state (1=online,0=offline): {current_state}")
+
+
             cursor.execute("""
                 SELECT * FROM device_status_alarm_log
                 WHERE DEVICE_ID=%s AND IS_ACTIVE=1
@@ -395,6 +400,11 @@ def check_device_online_status():
                 LIMIT 1
             """, (devid,))
             alarm = cursor.fetchone()
+
+            log(f"🧠 Existing alarm: {alarm}")
+            log(f"📞 Phones: {phones}")
+            log(f"📧 Emails: {emails}")
+
 
             # ---------- ONLINE ----------
             if current_state == 1 and alarm and alarm["IS_ACTIVE"] == 1:
