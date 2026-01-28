@@ -44,10 +44,10 @@ def log(msg):
 def build_message(ntf_typ, devnm):
     if ntf_typ == 3:
         # return f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP"
-        return f"WARNING!! The  {devnm} is offline. Please take necessary action- Regards Fertisense LLP"
+        return f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP"
     if ntf_typ == 5:
         #return f"INFO!! The {devnm} is back online. No action is required - Regards Fertisense LLP"
-        return f"INFO!! The  {devnm} is back online. No action is required - Regards Fertisense LLP"
+        return f"INFO!! The {devnm} is back online. No action is required - Regards Fertisense LLP"
 
     return f"Alert for {devnm}- Regards Fertisense LLP"
 
