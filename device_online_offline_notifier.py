@@ -62,7 +62,7 @@ def send_sms_single(phone, message, devnm):
             "sender_id": SENDER_ID,
             "type": "N",
             "text": message,
-            "var1": devnm
+            "var": devnm
         }
 
         log("========== SMS DEBUG START ==========")
