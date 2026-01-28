@@ -47,7 +47,7 @@ def log(msg):
 def build_message(ntf_typ, devnm):
     messages = {
         3: f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP",
-        5: f"INFO!! The {devnm} is back online. No action is required- Regards Fertisense LLP",
+        5: f"INFO!! The {devnm} is back online. No action is required - Regards Fertisense LLP",
     }
     return messages.get(ntf_typ, f"Alert for {devnm}- Regards Fertisense LLP")
 
