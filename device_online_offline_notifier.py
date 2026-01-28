@@ -44,24 +44,25 @@ def log(msg):
 def build_message(ntf_typ, devnm):
     if ntf_typ == 3:
         # return f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP"
-        return f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP"
+        return "WARNING!! The {#var#} is offline. Please take necessary action- Regards Fertisense LLP"
     if ntf_typ == 5:
         #return f"INFO!! The {devnm} is back online. No action is required - Regards Fertisense LLP"
-        return f"INFO!! The {devnm} is back online. No action is required - Regards Fertisense LLP"
+        return "INFO!! The {#var#} is back online. No action is required - Regards Fertisense LLP"
 
-    return f"Alert for {devnm}- Regards Fertisense LLP"
+    # return "Alert for {#var#}- Regards Fertisense LLP"
 
 
 # ================== SMS ==================
-def send_sms_single(phone, message):
+def send_sms_single(phone, message, devnm):
     try:
         params = {
             "user_name": SMS_USER,
             "user_password": SMS_PASS,
             "mobile": str(phone).strip(),
             "sender_id": SENDER_ID,
-            "type": "F",
-            "text": message
+            "type": "N",
+            "text": message,
+            "var1": devnm
         }
 
         log("========== SMS DEBUG START ==========")
@@ -85,27 +86,27 @@ def send_sms_single(phone, message):
         return False
 
 
-def send_sms(phones, message):
+def send_sms(phones, message, devnm):
 
-    log(f"📨 send_sms CALLED")
-    log(f"📞 Phones List : {phones}")
-    log(f"📄 Message    : {message}")
-
-    # sent = False
-    # for p in phones:
-    #     if send_sms_single(p, message):
-    #         sent = True
-    # return sent
+    # log(f"📨 send_sms CALLED")
+    # log(f"📞 Phones List : {phones}")
+    # log(f"📄 Message    : {message}")
 
     sent = False
     for p in phones:
-        ok = send_sms_single(p, message)
-        log(f"➡️ Result for {p} : {ok}")
-        if ok:
+        if send_sms_single(p, message, devnm):
             sent = True
-
-    log(f"✅ FINAL SMS RESULT : {sent}")
     return sent
+
+    # sent = False
+    # for p in phones:
+    #     ok = send_sms_single(p, message)
+    #     log(f"➡️ Result for {p} : {ok}")
+    #     if ok:
+    #         sent = True
+
+    # log(f"✅ FINAL SMS RESULT : {sent}")
+    # return sent
 
 
 # ================== EMAIL ==================
@@ -246,7 +247,7 @@ def check_device_online_status():
                     log(f"PHONES     : {phones}")
                     log("=========================")
 
-                    sms_ok = send_sms(phones, build_message(3, devnm))
+                    sms_ok = send_sms(phones, build_message(3, devnm), devnm)
                     email_ok = send_email(
                         f"{devnm} Offline",
                         offline_html(devnm, diff),
@@ -323,7 +324,7 @@ def check_device_online_status():
                 log(f"PHONES     : {phones}")
                 log("============================")
  
-                sms_ok = send_sms(phones, build_message(5, devnm))
+                sms_ok = send_sms(phones, build_message(5, devnm), devnm)
                 email_ok = send_email(
                     f"{devnm} Back Online",
                     online_html(devnm),
