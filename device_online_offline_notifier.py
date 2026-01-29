@@ -195,8 +195,8 @@ def check_device_online_offline():
 
 
         # ================= OFFLINE =================
-        # if not is_online and prev_status != 1:
-        if not is_online:
+         if not is_online and prev_status != 1:
+        # if not is_online:
             msg = f"WARNING!! The {device_name} is offline. Please take necessary action-Regards Fertisense LLP"
 
 
