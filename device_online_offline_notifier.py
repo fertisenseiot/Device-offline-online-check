@@ -1,369 +1,215 @@
 import os
-import mysql.connector
+import pymysql
 import requests
-import pytz
-import traceback
-from datetime import datetime, time as dt_time, timedelta, timezone
+from datetime import datetime, timedelta
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 
-
-# ================== ENV ==================
-BREVO_API_KEY = os.getenv("BREVO_API_KEY")
-
-# ================== GLOBAL CACHE ==================
-CONTACT_CACHE = {}
-
-# ================== CONFIG ==================
+# =====================================================
+# DATABASE CONFIG
+# =====================================================
 db_config = {
     "host": "switchyard.proxy.rlwy.net",
     "user": "root",
     "port": 28085,
     "password": "NOtYUNawwodSrBfGubHhwKaFtWyGXQct",
     "database": "railway",
+    "cursorclass": pymysql.cursors.DictCursor
 }
 
+# =====================================================
+# SMS CONFIG (Universal SMS)
+# =====================================================
 SMS_API_URL = "https://www.universalsmsadvertising.com/universalsmsapi.php"
 SMS_USER = "8960853914"
 SMS_PASS = "8960853914"
 SENDER_ID = "FRTLLP"
 
-OFFLINE_THRESHOLD = 5  # minutes
+# =====================================================
+# BREVO EMAIL CONFIG
+# =====================================================
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+BREVO_SENDER_EMAIL = "fertisenseiot@gmail.com"   # VERIFIED
+BREVO_SENDER_NAME = "Fertisense LLP"
 
-EMAIL_USER = "fertisenseiot@gmail.com"
-
-IST = pytz.timezone("Asia/Kolkata")
-UTC = timezone.utc
-
-
-# ================== HELPERS ==================
-def log(msg):
-    print(f"[{datetime.now().isoformat(sep=' ', timespec='seconds')}] {msg}")
-
-
-def build_message(ntf_typ, devnm):
-    if ntf_typ == 3:
-        # return f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP"
-        return "WARNING!! The {#var#} is offline. Please take necessary action- Regards Fertisense LLP"
-    if ntf_typ == 5:
-        #return f"INFO!! The {devnm} is back online. No action is required - Regards Fertisense LLP"
-        return "INFO!! The {#var#} is back online. No action is required - Regards Fertisense LLP"
-
-    # return "Alert for {#var#}- Regards Fertisense LLP"
-
-
-# ================== SMS ==================
-def send_sms_single(phone, message, devnm):
+# =====================================================
+# SMS FUNCTION
+# =====================================================
+def send_sms(message, mobile):
     try:
-        params = {
-            "user_name": SMS_USER,
-            "user_password": SMS_PASS,
-            "mobile": str(phone).strip(),
-            "sender_id": SENDER_ID,
-            "type": "N",
+        payload = {
+            "user": SMS_USER,
+            "password": SMS_PASS,
+            "senderid": SENDER_ID,
+            "channel": "Trans",
+            "DCS": 0,
+            "flashsms": 0,
+            "number": mobile,
             "text": message,
-            "var": devnm
+            "route": "1"
         }
-
-        log("========== SMS DEBUG START ==========")
-        log(f"PHONE        : {phone}")
-        log(f"SENDER_ID    : {SENDER_ID}")
-        log(f"MESSAGE TEXT : {message}")
-        log(f"FULL PARAMS  : {params}")
-
-        r = requests.get(SMS_API_URL, params=params, timeout=30)
-
-        log(f"HTTP STATUS  : {r.status_code}")
-        log(f"RAW RESPONSE : '{r.text.strip()}'")
-        log("=========== SMS DEBUG END ===========")
-
-        log(f"SMS -> {phone} | HTTP={r.status_code}")
-        return r.status_code == 200
-    
+        requests.get(SMS_API_URL, params=payload, timeout=10)
     except Exception as e:
-        log("❌ SMS EXCEPTION")
-        log(str(e))
-        return False
+        print("SMS Error:", e)
 
-
-def send_sms(phones, message, devnm):
-
-    # log(f"📨 send_sms CALLED")
-    # log(f"📞 Phones List : {phones}")
-    # log(f"📄 Message    : {message}")
-
-    sent = False
-    for p in phones:
-        if send_sms_single(p, message, devnm):
-            sent = True
-    return sent
-
-    # sent = False
-    # for p in phones:
-    #     ok = send_sms_single(p, message)
-    #     log(f"➡️ Result for {p} : {ok}")
-    #     if ok:
-    #         sent = True
-
-    # log(f"✅ FINAL SMS RESULT : {sent}")
-    # return sent
-
-
-# ================== EMAIL ==================
-def send_email(subject, html_content, email_ids):
-    if not email_ids:
-        return False
+# =====================================================
+# EMAIL FUNCTION (BREVO SDK)
+# =====================================================
+def send_email(subject, message, to_email):
     try:
-        configuration = sib_api_v3_sdk.Configuration()
-        configuration.api_key['api-key'] = BREVO_API_KEY
-        api = sib_api_v3_sdk.TransactionalEmailsApi(
-            sib_api_v3_sdk.ApiClient(configuration)
+        config = sib_api_v3_sdk.Configuration()
+        config.api_key["api-key"] = BREVO_API_KEY
+
+        api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+            sib_api_v3_sdk.ApiClient(config)
         )
-        api.send_transac_email(
-            sib_api_v3_sdk.SendSmtpEmail(
-                subject=subject,
-                html_content=html_content,
-                sender={"name": "Fertisense", "email": EMAIL_USER},
-                to=[{"email": e} for e in email_ids]
-            )
+
+        email = sib_api_v3_sdk.SendSmtpEmail(
+            sender={
+                "name": BREVO_SENDER_NAME,
+                "email": BREVO_SENDER_EMAIL
+            },
+            to=[{"email": to_email}],
+            subject=subject,
+            html_content=f"""
+                <html>
+                    <body>
+                        <p>{message}</p>
+                        <br>
+                        <p>Regards,<br><b>Fertisense LLP</b></p>
+                    </body>
+                </html>
+            """
         )
-        log(f"📧 Email sent -> {email_ids}")
-        return True
+
+        api_instance.send_transac_email(email)
+
     except ApiException as e:
-        log(f"❌ Email error: {e}")
-        return False
+        print("Email Error:", e)
 
-
-def offline_html(dev_name, diff):
-    return f"""
-    <html><body>
-    <h2 style="color:#b02a2a">⚠ {dev_name} is OFFLINE</h2>
-    <p>Last seen {diff:.1f} minutes ago</p>
-    <hr>Regards<br/>Fertisense LLP
-    </body></html>
-    """
-
-
-def online_html(dev_name):
-    return f"""
-    <html><body>
-    <h2 style="color:#2a9d2a">✔ {dev_name} is BACK ONLINE</h2>
-    <p>No action required.</p>
-    <hr>Regards<br/>Fertisense LLP
-    </body></html>
-    """
-
-
-# ================== CONTACT FETCH ==================
-def get_contact_info(cursor, device_id):
-    if device_id in CONTACT_CACHE:
-        return CONTACT_CACHE[device_id]
-
+# =====================================================
+# FETCH USERS FOR ORG + CENTRE
+# =====================================================
+def get_alert_users(cursor, organization_id, centre_id):
     cursor.execute("""
-        SELECT u.PHONE, u.EMAIL
-        FROM userorganizationcentrelink l
-        JOIN master_user u ON l.USER_ID_id = u.USER_ID
-        JOIN iot_api_masterdevice d ON d.ORGANIZATION_ID=l.ORGANIZATION_ID_id
-        WHERE d.DEVICE_ID=%s
-    """, (device_id,))
+        SELECT 
+            u.USER_ID,
+            u.PHONE,
+            u.EMAIL,
+            u.SEND_SMS,
+            u.SEND_EMAIL
+        FROM master_user u
+        JOIN userorganizationcentrelink l
+            ON l.USER_ID_id = u.USER_ID
+        WHERE l.ORGANIZATION_ID_id = %s
+          AND l.CENTRE_ID_id = %s
+    """, (organization_id, centre_id))
 
-    phones, emails = [], []
-    for r in cursor.fetchall():
-        if r["PHONE"]:
-            phones.extend(p.strip() for p in r["PHONE"].replace("/", ",").split(","))
-        if r["EMAIL"]:
-            emails.append(r["EMAIL"].strip())
+    return cursor.fetchall()
 
-    phones = list(dict.fromkeys(phones))
-    emails = list(dict.fromkeys(emails))
+# =====================================================
+# CORE LOGIC
+# =====================================================
+def check_device_online_offline():
+    conn = pymysql.connect(**db_config)
+    cursor = conn.cursor()
 
-    CONTACT_CACHE[device_id] = (phones, emails)
-    return phones, emails
+    now = datetime.now()
+    five_min_ago = now - timedelta(minutes=5)
 
+    # All devices
+    cursor.execute("SELECT DISTINCT DEVICE_ID FROM device_reading_log")
+    devices = cursor.fetchall()
 
-# ================== TIME PARSER ==================
-def parse_reading_time(val):
-    if isinstance(val, dt_time):
-        return val
-    if isinstance(val, timedelta):
-        s = int(val.total_seconds())
-        return dt_time(s // 3600, (s % 3600) // 60, s % 60)
-    if isinstance(val, str):
-        h, m, *s = map(int, val.split(":"))
-        return dt_time(h, m, s[0] if s else 0)
-    return None
+    for d in devices:
+        device_id = d["DEVICE_ID"]
 
-
-# ================== MAIN ==================
-def check_device_online_status():
-    conn = cursor = None
-    try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
-        now = datetime.now(IST)
-
-        # ================= PASS 1 : OFFLINE =================
-        log("🔴 PASS 1 : OFFLINE CHECK")
-
-        cursor.execute("SELECT DEVICE_ID, DEVICE_NAME FROM iot_api_masterdevice")
-        devices = cursor.fetchall()
-
-        for d in devices:
-            devid = d["DEVICE_ID"]
-            devnm = d.get("DEVICE_NAME") or f"Device-{devid}"
-            phones, emails = get_contact_info(cursor, devid)
-
-            cursor.execute("""
-                SELECT READING_DATE, READING_TIME
-                FROM device_reading_log
-                WHERE DEVICE_ID=%s
-                ORDER BY READING_DATE DESC, READING_TIME DESC
-                LIMIT 1
-            """, (devid,))
-            r = cursor.fetchone()
-
-            last_update = None
-            if r:
-                rt = parse_reading_time(r["READING_TIME"])
-                if rt:
-                    last_update = datetime.combine(
-                        r["READING_DATE"], rt
-                    ).replace(tzinfo=UTC).astimezone(IST)
-
-            diff = (now - last_update).total_seconds() / 60 if last_update else 999
-
-            if diff > OFFLINE_THRESHOLD:
-                cursor.execute("""
-                    SELECT 1 FROM device_status_alarm_log
-                    WHERE DEVICE_ID=%s AND IS_ACTIVE=1
-                """, (devid,))
-                if not cursor.fetchone():
-                    log(f"🔴 OFFLINE -> {devnm}")
-                    log("===== OFFLINE DEBUG =====")
-                    log(f"DEVICE_ID  : {devid}")
-                    log(f"DEVICE_NAME: {devnm}")
-                    log(f"LAST_UPDATE: {last_update}")
-                    log(f"DIFF_MIN   : {diff}")
-                    log(f"PHONES     : {phones}")
-                    log("=========================")
-
-                    sms_ok = send_sms(phones, build_message(3, devnm), devnm)
-                    email_ok = send_email(
-                        f"{devnm} Offline",
-                        offline_html(devnm, diff),
-                        emails
-                    )
-
-                    cursor.execute("""
-                        INSERT INTO device_status_alarm_log
-                        (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE,
-                         CREATED_ON_DATE, CREATED_ON_TIME,
-                         SMS_DATE, SMS_TIME, EMAIL_DATE, EMAIL_TIME)
-                        VALUES (%s,1,1,%s,%s,%s,%s,%s,%s)
-                    """, (
-                        devid,
-                        now.date(), now.time(),
-                        now.date() if sms_ok else None,
-                        now.time() if sms_ok else None,
-                        now.date() if email_ok else None,
-                        now.time() if email_ok else None
-                    ))
-                    conn.commit()
-
-        # ================= PASS 2 : BACK ONLINE =================
-        log("🟢 PASS 2 : BACK ONLINE CHECK")
-
+        # Last reading
         cursor.execute("""
-            SELECT DEVICE_STATUS_ALARM_ID, DEVICE_ID
+            SELECT CONCAT(READING_DATE,' ',READING_TIME) AS last_time
+            FROM device_reading_log
+            WHERE DEVICE_ID = %s
+            ORDER BY READING_DATE DESC, READING_TIME DESC
+            LIMIT 1
+        """, (device_id,))
+        last = cursor.fetchone()
+
+        if not last:
+            continue
+
+        last_time = datetime.strptime(
+            str(last["last_time"]), "%Y-%m-%d %H:%M:%S.%f"
+        )
+
+        is_online = last_time >= five_min_ago
+
+        # Device org + centre
+        cursor.execute("""
+            SELECT ORGANIZATION_ID, CENTRE_ID
+            FROM iot_api_masterdevice
+            WHERE DEVICE_ID = %s
+        """, (device_id,))
+        device_info = cursor.fetchone()
+
+        if not device_info:
+            continue
+
+        organization_id = device_info["ORGANIZATION_ID"]
+        centre_id = device_info["CENTRE_ID"]
+
+        # Previous status
+        cursor.execute("""
+            SELECT DEVICE_STATUS
             FROM device_status_alarm_log
-            WHERE IS_ACTIVE=1
-        """)
-        alarms = cursor.fetchall()
+            WHERE DEVICE_ID = %s
+            ORDER BY DEVICE_STATUS_ALARM_ID DESC
+            LIMIT 1
+        """, (device_id,))
+        prev = cursor.fetchone()
+        prev_status = prev["DEVICE_STATUS"] if prev else None
 
-        for a in alarms:
-            devid = a["DEVICE_ID"]
-            alarm_id = a["DEVICE_STATUS_ALARM_ID"]
+        users = get_alert_users(cursor, organization_id, centre_id)
 
-            cursor.execute(
-                "SELECT DEVICE_NAME FROM iot_api_masterdevice WHERE DEVICE_ID=%s",
-                (devid,)
-            )
-            devnm = cursor.fetchone().get("DEVICE_NAME") or f"Device-{devid}"
+        # ================= OFFLINE =================
+        if not is_online and prev_status != 1:
+            msg = f"WARNING!! Device #{device_id} is OFFLINE. Please take necessary action."
 
-            phones, emails = get_contact_info(cursor, devid)
+            for user in users:
+                if user["SEND_SMS"] == 1 and user["PHONE"]:
+                    send_sms(msg, user["PHONE"])
+
+                if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
+                    send_email("Device Offline Alert", msg, user["EMAIL"])
 
             cursor.execute("""
-                SELECT READING_DATE, READING_TIME
-                FROM device_reading_log
-                WHERE DEVICE_ID=%s
-                ORDER BY READING_DATE DESC, READING_TIME DESC
-                LIMIT 1
-            """, (devid,))
-            r = cursor.fetchone()
-            if not r:
-                continue
+                INSERT INTO device_status_alarm_log
+                (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME)
+                VALUES (%s, 1, 1, CURDATE(), CURTIME())
+            """, (device_id,))
+            conn.commit()
 
-            rt = parse_reading_time(r["READING_TIME"])
-            if not rt:
-                continue
+        # ================= ONLINE =================
+        elif is_online and prev_status == 1:
+            msg = f"INFO!! Device #{device_id} is back ONLINE. No action required."
 
-            last_update = datetime.combine(
-                r["READING_DATE"], rt
-            ).replace(tzinfo=UTC).astimezone(IST)
+            for user in users:
+                if user["SEND_SMS"] == 1 and user["PHONE"]:
+                    send_sms(msg, user["PHONE"])
 
-            diff = (now - last_update).total_seconds() / 60
+                if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
+                    send_email("Device Online Info", msg, user["EMAIL"])
 
-            if diff <= OFFLINE_THRESHOLD:
-                log(f"🟢 BACK ONLINE -> {devnm}")
-                
-                log("===== BACK ONLINE DEBUG =====")
-                log(f"DEVICE_ID  : {devid}")
-                log(f"DEVICE_NAME: {devnm}")
-                log(f"LAST_UPDATE: {last_update}")
-                log(f"DIFF_MIN   : {diff}")
-                log(f"PHONES     : {phones}")
-                log("============================")
- 
-                sms_ok = send_sms(phones, build_message(5, devnm), devnm)
-                email_ok = send_email(
-                    f"{devnm} Back Online",
-                    online_html(devnm),
-                    emails
-                )
+            cursor.execute("""
+                INSERT INTO device_status_alarm_log
+                (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME)
+                VALUES (%s, 0, 0, CURDATE(), CURTIME())
+            """, (device_id,))
+            conn.commit()
 
-                cursor.execute("""
-                    UPDATE device_status_alarm_log
-                    SET IS_ACTIVE=0,
-                        UPDATED_ON_DATE=%s,
-                        UPDATED_ON_TIME=%s,
-                        SMS_DATE=%s,
-                        SMS_TIME=%s,
-                        EMAIL_DATE=%s,
-                        EMAIL_TIME=%s
-                    WHERE DEVICE_STATUS_ALARM_ID=%s
-                """, (
-                    now.date(), now.time(),
-                    now.date() if sms_ok else None,
-                    now.time() if sms_ok else None,
-                    now.date() if email_ok else None,
-                    now.time() if email_ok else None,
-                    alarm_id
-                ))
-                conn.commit()
+    conn.close()
 
-        log("✅ Device check completed")
-
-    except Exception as e:
-        log(f"❌ Fatal error: {e}")
-        traceback.print_exc()
-
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-
-# ================== RUN ==================
+# =====================================================
+# ENTRY POINT
+# =====================================================
 if __name__ == "__main__":
-    check_device_online_status()
+    check_device_online_offline()
