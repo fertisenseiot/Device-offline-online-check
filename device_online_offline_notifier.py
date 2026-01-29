@@ -165,7 +165,7 @@ def check_device_online_offline():
 
         # Device org + centre
         cursor.execute("""
-            SELECT ORGANIZATION_ID, CENTRE_ID
+            SELECT DEVICE_NAME, ORGANIZATION_ID, CENTRE_ID
             FROM iot_api_masterdevice
             WHERE DEVICE_ID = %s
         """, (device_id,))
@@ -173,7 +173,7 @@ def check_device_online_offline():
 
         if not device_info:
             continue
-
+        device_name = device_info["DEVICE_NAME"]
         organization_id = device_info["ORGANIZATION_ID"]
         centre_id = device_info["CENTRE_ID"]
 
@@ -197,7 +197,8 @@ def check_device_online_offline():
         # ================= OFFLINE =================
         # if not is_online and prev_status != 1:
         if not is_online:
-            msg = f"WARNING!! Device #{device_id} is OFFLINE. Please take necessary action."
+            msg = f"WARNING!! The {device_name} is offline. Please take necessary action-Regards Fertisense LLP"
+
 
             for user in users:
                 if user["SEND_SMS"] == 1 and user["PHONE"]:
@@ -215,7 +216,8 @@ def check_device_online_offline():
 
         # ================= ONLINE =================
         elif is_online and prev_status == 1:
-            msg = f"INFO!! Device #{device_id} is back ONLINE. No action required."
+            msg = f"INFO!! The {device_name} is back online. No action is required - Regards Fertisense LLP"
+
 
             for user in users:
                 if user["SEND_SMS"] == 1 and user["PHONE"]:
