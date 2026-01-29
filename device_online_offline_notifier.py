@@ -133,7 +133,10 @@ def check_device_online_offline():
     five_min_ago = now - timedelta(minutes=5)
 
     # All devices
-    cursor.execute("SELECT DISTINCT DEVICE_ID FROM device_reading_log")
+    cursor.execute("""SELECT DEVICE_ID, DEVICE_NAME, ORGANIZATION_ID, CENTRE_ID
+    FROM iot_api_masterdevice
+    WHERE DEVICE_STATUS = 1
+""")
     devices = cursor.fetchall()
 
     for d in devices:
@@ -164,30 +167,35 @@ def check_device_online_offline():
         print("📡 Is Online:", is_online)
 
         # Device org + centre
-        cursor.execute("""
-            SELECT DEVICE_NAME, ORGANIZATION_ID, CENTRE_ID
-            FROM iot_api_masterdevice
-            WHERE DEVICE_ID = %s
-        """, (device_id,))
-        device_info = cursor.fetchone()
+        # cursor.execute("""
+        #     SELECT DEVICE_NAME, ORGANIZATION_ID, CENTRE_ID
+        #     FROM iot_api_masterdevice
+        #     WHERE DEVICE_ID = %s
+        # """, (device_id,))
+        # device_info = cursor.fetchone()
 
-        if not device_info:
-            continue
-        device_name = device_info["DEVICE_NAME"]
-        organization_id = device_info["ORGANIZATION_ID"]
-        centre_id = device_info["CENTRE_ID"]
+        # if not device_info:
+        #     continue
+        # device_name = device_info["DEVICE_NAME"]
+        # organization_id = device_info["ORGANIZATION_ID"]
+        # centre_id = device_info["CENTRE_ID"]
+
+        device_name = d["DEVICE_NAME"]
+        organization_id = d["ORGANIZATION_ID"]
+        centre_id = d["CENTRE_ID"]
+
 
         # Previous status
         cursor.execute("""
-            SELECT DEVICE_STATUS
-            FROM device_status_alarm_log
-            WHERE DEVICE_ID = %s
-            ORDER BY DEVICE_STATUS_ALARM_ID DESC
-            LIMIT 1
+           SELECT IS_ACTIVE
+           FROM device_status_alarm_log
+           WHERE DEVICE_ID = %s
+           ORDER BY DEVICE_STATUS_ALARM_ID DESC
+           LIMIT 1
         """, (device_id,))
         prev = cursor.fetchone()
-        prev_status = prev["DEVICE_STATUS"] if prev else None
-        print("📄 Previous Status:", prev_status)
+        prev_is_active = prev["IS_ACTIVE"] if prev else 0
+        print("📄 Previous Status:", prev_is_active)
 
         users = get_alert_users(cursor, organization_id, centre_id)
         print("👥 Users Found:", len(users))
@@ -195,8 +203,15 @@ def check_device_online_offline():
 
 
         # ================= OFFLINE =================
-         if not is_online and prev_status != 1:
-        # if not is_online:
+        if not is_online and prev_is_active != 1:
+
+                # 🔒 purana status close
+            cursor.execute("""
+               UPDATE device_status_alarm_log
+               SET IS_ACTIVE = 0
+               WHERE DEVICE_ID = %s AND IS_ACTIVE = 1
+            """, (device_id,))
+
             msg = f"WARNING!! The {device_name} is offline. Please take necessary action-Regards Fertisense LLP"
 
 
@@ -215,7 +230,14 @@ def check_device_online_offline():
             conn.commit()
 
         # ================= ONLINE =================
-        elif is_online and prev_status == 1:
+        elif is_online and prev_is_active == 1:
+
+            cursor.execute("""
+                UPDATE device_status_alarm_log
+                SET IS_ACTIVE = 0
+                WHERE DEVICE_ID = %s AND IS_ACTIVE = 1
+            """, (device_id,))
+
             msg = f"INFO!! The {device_name} is back online. No action is required - Regards Fertisense LLP"
 
 
@@ -229,7 +251,7 @@ def check_device_online_offline():
             cursor.execute("""
                 INSERT INTO device_status_alarm_log
                 (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME)
-                VALUES (%s, 0, 0, CURDATE(), CURTIME())
+                VALUES (%s, 1, 0, CURDATE(), CURTIME())
             """, (device_id,))
             conn.commit()
 
@@ -240,4 +262,3 @@ def check_device_online_offline():
 # =====================================================
 if __name__ == "__main__":
     check_device_online_offline()
-#
