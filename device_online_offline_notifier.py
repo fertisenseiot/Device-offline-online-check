@@ -37,6 +37,10 @@ BREVO_SENDER_NAME = "Fertisense LLP"
 # =====================================================
 def send_sms(message, mobile):
     try:
+        mobile = mobile.strip()
+        if not mobile.startswith("91"):
+            mobile = "91" + mobile
+        
         payload = {
             "user": SMS_USER,
             "password": SMS_PASS,
@@ -48,7 +52,8 @@ def send_sms(message, mobile):
             "text": message,
             "route": "1"
         }
-        requests.get(SMS_API_URL, params=payload, timeout=10)
+        r= requests.get(SMS_API_URL, params=payload, timeout=10)
+        
     except Exception as e:
         print("SMS Error:", e)
 
