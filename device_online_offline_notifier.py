@@ -212,7 +212,8 @@ def check_device_online_offline():
                WHERE DEVICE_ID = %s AND IS_ACTIVE = 1
             """, (device_id,))
 
-            msg = f"WARNING!! The {device_name} is offline. Please take necessary action-Regards Fertisense LLP"
+            # msg = f"WARNING!! The {device_name} is offline. Please take necessary action-Regards Fertisense LLP"
+            msg = f"WARNING!! The {device_name} is offline. Please take necessary action- Regards Fertisense LLP"
 
 
             for user in users:
