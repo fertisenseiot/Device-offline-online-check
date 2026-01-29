@@ -5,6 +5,9 @@ from datetime import datetime, timedelta
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 
+# 🔥 DEBUG START (YAHI LAGANA HAI)
+print("🚀 Device Online/Offline Script Started")
+
 # =====================================================
 # DATABASE CONFIG
 # =====================================================
@@ -29,6 +32,7 @@ SENDER_ID = "FRTLLP"
 # BREVO EMAIL CONFIG
 # =====================================================
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+print("🔑 BREVO_API_KEY FOUND:", bool(BREVO_API_KEY))
 BREVO_SENDER_EMAIL = "fertisenseiot@gmail.com"   # VERIFIED
 BREVO_SENDER_NAME = "Fertisense LLP"
 
@@ -53,7 +57,8 @@ def send_sms(message, mobile):
             "route": "1"
         }
         r= requests.get(SMS_API_URL, params=payload, timeout=10)
-        
+        print("📱 SMS API RESPONSE:", r.text)
+
     except Exception as e:
         print("SMS Error:", e)
 
@@ -87,7 +92,12 @@ def send_email(subject, message, to_email):
             """
         )
 
-        api_instance.send_transac_email(email)
+        # api_instance.send_transac_email(email)
+
+        response = api_instance.send_transac_email(email)
+        print(f"📧 Email sent successfully to {to_email}")
+        print("Brevo Message ID:", response.message_id)
+
 
     except ApiException as e:
         print("Email Error:", e)
@@ -129,6 +139,8 @@ def check_device_online_offline():
     for d in devices:
         device_id = d["DEVICE_ID"]
 
+        print("\n🔍 Checking DEVICE_ID:", device_id)
+
         # Last reading
         cursor.execute("""
             SELECT CONCAT(READING_DATE,' ',READING_TIME) AS last_time
@@ -147,6 +159,9 @@ def check_device_online_offline():
         )
 
         is_online = last_time >= five_min_ago
+        print("🕒 Last Reading Time:", last_time)
+        print("⏱ 5 Min Threshold:", five_min_ago)
+        print("📡 Is Online:", is_online)
 
         # Device org + centre
         cursor.execute("""
@@ -172,11 +187,16 @@ def check_device_online_offline():
         """, (device_id,))
         prev = cursor.fetchone()
         prev_status = prev["DEVICE_STATUS"] if prev else None
+        print("📄 Previous Status:", prev_status)
 
         users = get_alert_users(cursor, organization_id, centre_id)
+        print("👥 Users Found:", len(users))
+
+
 
         # ================= OFFLINE =================
-        if not is_online and prev_status != 1:
+        # if not is_online and prev_status != 1:
+        if not is_online:
             msg = f"WARNING!! Device #{device_id} is OFFLINE. Please take necessary action."
 
             for user in users:
