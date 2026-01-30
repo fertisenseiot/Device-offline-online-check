@@ -76,6 +76,9 @@ def send_sms(message, mobile):
 
     except Exception as e:
         print("SMS Error:", e)
+        if payload:
+            print("📤 SMS PAYLOAD:", payload)
+
 
 # =====================================================
 # EMAIL FUNCTION (BREVO SDK)
@@ -243,7 +246,10 @@ def check_device_online_offline():
 
             for user in users:
                 if user["SEND_SMS"] == 1 and user["PHONE"]:
-                    send_sms(msg, user["PHONE"])
+                  numbers = str(user["PHONE"]).split(",")
+                  for num in numbers:
+                      send_sms(msg, num)
+
 
                 if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
                     send_email("Device Offline Alert", msg, user["EMAIL"])
@@ -269,7 +275,10 @@ def check_device_online_offline():
 
             for user in users:
                 if user["SEND_SMS"] == 1 and user["PHONE"]:
-                    send_sms(msg, user["PHONE"])
+                    numbers = str(user["PHONE"]).split(",")
+                    for num in numbers:
+                        send_sms(msg, num)
+
 
                 if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
                     send_email("Device Online Info", msg, user["EMAIL"])
