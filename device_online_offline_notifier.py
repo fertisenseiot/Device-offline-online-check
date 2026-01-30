@@ -1,9 +1,12 @@
 import os
 import pymysql
 import requests
+import pytz
 from datetime import datetime, timedelta
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
+
+IST = pytz.timezone("Asia/Kolkata")
 
 # 🔥 DEBUG START (YAHI LAGANA HAI)
 print("🚀 Device Online/Offline Script Started")
@@ -143,9 +146,10 @@ def check_device_online_offline():
 
     # now = datetime.now()
     # five_min_ago = now - timedelta(minutes=5)
-    cursor.execute("SELECT NOW() as db_now")
-    db_now = cursor.fetchone()["db_now"]
-    five_min_ago = db_now - timedelta(minutes=5)
+    # cursor.execute("SELECT NOW() as db_now")
+    # db_now = cursor.fetchone()["db_now"]
+    now = datetime.now(IST)
+    five_min_ago = now - timedelta(minutes=5)
 
 
     # All devices
@@ -172,16 +176,19 @@ def check_device_online_offline():
 
         if not last:
             continue
- 
+         
         try:
-           last_time = datetime.strptime(
-               str(last["last_time"]), "%Y-%m-%d %H:%M:%S.%f"
+            last_time = datetime.strptime(
+                str(last["last_time"]), "%Y-%m-%d %H:%M:%S.%f"
             )
-           
         except ValueError:
             last_time = datetime.strptime(
                 str(last["last_time"]), "%Y-%m-%d %H:%M:%S"
             )
+
+        # 🔑 FINAL FIX — make last_time timezone-aware
+        if last_time.tzinfo is None:
+           last_time = IST.localize(last_time)
 
         is_online = last_time >= five_min_ago
         print("🕒 Last Reading Time:", last_time)
@@ -225,9 +232,10 @@ def check_device_online_offline():
 
 
         # ================= OFFLINE =================
-        # if not is_online and prev_is_active != 1:
-        if not is_online:
-
+        if not is_online and prev_is_active != 1:
+        # if not is_online:
+            sms_sent = False
+            email_sent = False
 
                 # 🔒 purana status close
             cursor.execute("""
@@ -236,33 +244,40 @@ def check_device_online_offline():
                WHERE DEVICE_ID = %s AND IS_ACTIVE = 1
             """, (device_id,))
 
-            # msg = f"WARNING!! The {device_name} is offline. Please take necessary action-Regards Fertisense LLP"
-            # msg = f"WARNING!! The {device_name} is offline. Please take necessary action- Regards Fertisense LLP"
             msg = build_message(3, device_name)
-
-            
-
 
             for user in users:
                 if user["SEND_SMS"] == 1 and user["PHONE"]:
-                  numbers = str(user["PHONE"]).split(",")
-                  for num in numbers:
-                      send_sms(msg, num)
-
+                    for num in str(user["PHONE"]).split(","):
+                        if send_sms(msg, num):
+                            sms_sent = True
 
                 if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
                     send_email("Device Offline Alert", msg, user["EMAIL"])
+                    email_sent = True
 
             cursor.execute("""
                 INSERT INTO device_status_alarm_log
-                (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME)
-                VALUES (%s, %s, 1, CURDATE(), CURTIME())
-            """, (device_id, 1))
+                (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME, SMS_DATE, SMS_TIME, EMAIL_DATE, EMAIL_TIME)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                device_id,
+                1,
+                1,
+                now.date(),
+                now.time(),
+                now.date() if sms_sent else None,
+                now.time() if sms_sent else None,
+                now.date() if email_sent else None,
+                now.time() if email_sent else None
+            ))
             conn.commit()
 
         # ================= ONLINE =================
-        # elif is_online and prev_is_active == 1:
-        elif is_online:
+        elif is_online and prev_is_active == 1:
+        # elif is_online:
+            sms_sent = False
+            email_sent = False
 
             cursor.execute("""
                 UPDATE device_status_alarm_log
@@ -277,19 +292,30 @@ def check_device_online_offline():
 
             for user in users:
                 if user["SEND_SMS"] == 1 and user["PHONE"]:
-                    numbers = str(user["PHONE"]).split(",")
-                    for num in numbers:
-                        send_sms(msg, num)
+                    for num in str(user["PHONE"]).split(","):
+                        if send_sms(msg, num):
+                           sms_sent = True
 
 
                 if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
                     send_email("Device Online Info", msg, user["EMAIL"])
+                    email_sent = True
 
             cursor.execute("""
                 INSERT INTO device_status_alarm_log
-                (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME)
-                VALUES (%s, %s, 0, CURDATE(), CURTIME())
-            """, (device_id, 0))
+                (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME, SMS_DATE, SMS_TIME, EMAIL_DATE, EMAIL_TIME)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                device_id,
+                0,
+                0,
+                now.date(),
+                now.time(),
+                now.date() if sms_sent else None,
+                now.time() if sms_sent else None,
+                now.date() if email_sent else None,
+                now.time() if email_sent else None
+            ))
             conn.commit()
 
     conn.close()
