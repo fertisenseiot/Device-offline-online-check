@@ -377,7 +377,7 @@ def check_device_online_status():
             log(f"DEBUG existing_alarm={existing_alarm}")
 
             # ---------- DEVICE ONLINE ----------
-            if current_state == 1:
+            if is_online:
                 log(f"✅ {devnm} is ONLINE (diff_min={diff_minutes:.1f})")
                 if existing_alarm:
                     log("➡ Found open offline alarm - will close it and send ONLINE notifications")
