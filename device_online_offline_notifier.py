@@ -334,7 +334,7 @@ def check_device_online_status():
                 rt = parse_reading_time(last_read.get("READING_TIME"))
                 if rd and rt:
                     # Combine date+time (naive local)
-                    last_update = datetime.combine(rd, rt)
+                    last_update = IST_PYTZ.localize(datetime.combine(rd, rt))
                 else:
                     # couldn't parse time properly
                     log(f"DEBUG could not parse READING_TIME: {last_read.get('READING_TIME')}")
