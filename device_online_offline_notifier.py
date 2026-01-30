@@ -241,7 +241,8 @@ def check_device_online_offline():
             """, (device_id,))
 
             # msg = f"WARNING!! The {device_name} is offline. Please take necessary action-Regards Fertisense LLP"
-            msg = f"WARNING!! The {device_name} is offline. Please take necessary action- Regards Fertisense LLP"
+            # msg = f"WARNING!! The {device_name} is offline. Please take necessary action- Regards Fertisense LLP"
+            msg = f"WARNING!! The Temperature of {device_name} has dipped below the lower limit. Please take necessary action- Regards Fertisense LLP"
 
 
             for user in users:
