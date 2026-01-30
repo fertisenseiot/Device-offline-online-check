@@ -245,16 +245,53 @@ def check_device_online_offline():
             """, (device_id,))
 
             msg = build_message(3, device_name)
+            
+            phones = []
+            emails = []
 
             for user in users:
                 if user["SEND_SMS"] == 1 and user["PHONE"]:
-                    for num in str(user["PHONE"]).split(","):
-                        if send_sms(msg, num):
-                            sms_sent = True
-
+                    phones.append(user["PHONE"])
+                    # for num in str(user["PHONE"]).split(","):
+                    #     if send_sms(msg, num):
+                    #         sms_sent = True
+                
                 if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
-                    send_email("Device Offline Alert", msg, user["EMAIL"])
-                    email_sent = True
+                     emails.append(user["EMAIL"])
+
+            # 🔑 FLATTEN + DEDUPE
+            flat_phones = []
+            for p in phones:
+                if p:
+                   for part in p.split(","):
+                       num = part.strip()
+                       if num:
+                          flat_phones.append(num)
+
+            unique_phones = list(set(flat_phones))
+            print("Unique phone numbers:", unique_phones)
+
+            
+            # 3️⃣ FLATTEN + DEDUPE EMAILS
+            unique_emails = list(set([e.strip() for e in emails if e.strip()]))
+            print("📧 Unique emails:", unique_emails)
+
+            
+            # 4️⃣ SEND SMS
+            sms_sent = False
+            for phone in unique_phones:
+                if send_sms(msg, phone):
+                    sms_sent = True
+
+            # 5️⃣ SEND EMAIL
+            email_sent = False
+            for email in unique_emails:
+                send_email("Device Offline Alert", msg, email)
+                email_sent = True
+
+                # if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
+                #     send_email("Device Offline Alert", msg, user["EMAIL"])
+                #     email_sent = True
 
             cursor.execute("""
                 INSERT INTO device_status_alarm_log
@@ -290,16 +327,48 @@ def check_device_online_offline():
 
 
 
+            phones = []
+            emails = []
+
             for user in users:
                 if user["SEND_SMS"] == 1 and user["PHONE"]:
-                    for num in str(user["PHONE"]).split(","):
-                        if send_sms(msg, num):
-                           sms_sent = True
-
-
+                    phones.append(user["PHONE"])
+                    # for num in str(user["PHONE"]).split(","):
+                    #     if send_sms(msg, num):
+                    #         sms_sent = True
+                
                 if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
-                    send_email("Device Online Info", msg, user["EMAIL"])
-                    email_sent = True
+                     emails.append(user["EMAIL"])
+
+            # 🔑 FLATTEN + DEDUPE
+            flat_phones = []
+            for p in phones:
+                if p:
+                   for part in p.split(","):
+                       num = part.strip()
+                       if num:
+                          flat_phones.append(num)
+
+            unique_phones = list(set(flat_phones))
+            print("Unique phone numbers:", unique_phones)
+
+            
+            # 3️⃣ FLATTEN + DEDUPE EMAILS
+            unique_emails = list(set([e.strip() for e in emails if e.strip()]))
+            print("📧 Unique emails:", unique_emails)
+
+            
+            # 4️⃣ SEND SMS
+            sms_sent = False
+            for phone in unique_phones:
+                if send_sms(msg, phone):
+                    sms_sent = True
+
+            # 5️⃣ SEND EMAIL
+            email_sent = False
+            for email in unique_emails:
+                send_email("Device Online Info", msg, email)
+                email_sent = True
 
             cursor.execute("""
                 INSERT INTO device_status_alarm_log
