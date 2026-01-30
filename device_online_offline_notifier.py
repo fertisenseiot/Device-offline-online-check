@@ -310,6 +310,71 @@ def check_device_online_offline():
             ))
             conn.commit()
 
+        # ================= SECOND NOTIFICATION (6 HOURS) =================
+            cursor.execute("""
+            SELECT *
+            FROM device_status_alarm_log
+            WHERE DEVICE_ID = %s AND IS_ACTIVE = 1
+            ORDER BY DEVICE_STATUS_ALARM_ID DESC
+            LIMIT 1
+            """, (device_id,))
+            alarm = cursor.fetchone()
+
+        if alarm and alarm["SMS_DATE"] and alarm["SMS_TIME"]:
+
+            last_sms_dt = IST.localize(
+               datetime.combine(alarm["SMS_DATE"], alarm["SMS_TIME"])
+            )
+
+        elapsed = (now - last_sms_dt).total_seconds()
+        print("⏱ Seconds since last SMS:", elapsed)
+
+        if elapsed >= 6 * 3600:
+            print("🔁 6 hours passed → sending second notification")
+
+            msg = build_message(3, device_name)
+
+            phones, emails = [], []
+
+            for user in users:
+                if user["SEND_SMS"] == 1 and user["PHONE"]:
+                   phones.append(user["PHONE"])
+                if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
+                    emails.append(user["EMAIL"])
+
+            unique_phones = list(set(
+                p.strip()
+                for ph in phones for p in ph.split(",") if p.strip()
+            ))
+            unique_emails = list(set(e.strip() for e in emails if e.strip()))
+
+            sms_sent = False
+            for phone in unique_phones:
+                if send_sms(msg, phone):
+                    sms_sent = True
+
+            email_sent = False
+            for email in unique_emails:
+                send_email("Device Offline Alert", msg, email)
+                email_sent = True
+
+            cursor.execute("""
+            UPDATE device_status_alarm_log
+            SET SMS_DATE=%s,
+                SMS_TIME=%s,
+                EMAIL_DATE=%s,
+                EMAIL_TIME=%s
+            WHERE DEVICE_STATUS_ALARM_ID=%s
+            """, (
+                now.date() if sms_sent else alarm["SMS_DATE"],
+                now.time() if sms_sent else alarm["SMS_TIME"],
+                now.date() if email_sent else alarm["EMAIL_DATE"],
+                now.time() if email_sent else alarm["EMAIL_TIME"],
+                alarm["DEVICE_STATUS_ALARM_ID"]
+            ))
+            conn.commit()
+
+
         # ================= ONLINE =================
         elif is_online and prev_is_active == 1:
         # elif is_online:
