@@ -29,6 +29,17 @@ SMS_PASS = "8960853914"
 SENDER_ID = "FRTLLP"
 
 # =====================================================
+# SMS FOR NOTIFICATION
+# =====================================================
+def build_message(ntf_typ, devnm):
+    messages = {
+        3: f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP",
+        5: f"INFO!! The device {devnm} is back online. No action is required - Regards Fertisense LLP",
+    }
+    return messages.get(ntf_typ, f"Alert for {devnm} - Regards Fertisense LLP")
+
+
+# =====================================================
 # BREVO EMAIL CONFIG
 # =====================================================
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
@@ -242,7 +253,9 @@ def check_device_online_offline():
 
             # msg = f"WARNING!! The {device_name} is offline. Please take necessary action-Regards Fertisense LLP"
             # msg = f"WARNING!! The {device_name} is offline. Please take necessary action- Regards Fertisense LLP"
-            msg = f"WARNING!! The Temperature of {device_name} has dipped below the lower limit. Please take necessary action- Regards Fertisense LLP"
+            msg = build_message(3, device_name)
+
+            
 
 
             for user in users:
@@ -271,7 +284,9 @@ def check_device_online_offline():
                 WHERE DEVICE_ID = %s AND IS_ACTIVE = 1
             """, (device_id,))
 
-            msg = f"INFO!! The {device_name} is back online. No action is required - Regards Fertisense LLP"
+            # msg = f"INFO!! The {device_name} is back online. No action is required - Regards Fertisense LLP"
+            msg = build_message(5, device_name)
+
 
 
             for user in users:
