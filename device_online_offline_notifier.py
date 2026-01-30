@@ -41,10 +41,20 @@ BREVO_SENDER_NAME = "Fertisense LLP"
 # =====================================================
 def send_sms(message, mobile):
     try:
-        mobile = mobile.strip()
+        # 🔹 Mobile sanitize
+        mobile = str(mobile).strip()
+        mobile = mobile.replace(" ", "").replace("-", "")
+
+        if mobile.startswith("0"):
+            mobile = mobile[1:]
+
         if not mobile.startswith("91"):
             mobile = "91" + mobile
-        
+
+        if len(mobile) != 12:
+            print("❌ Invalid Mobile Number:", mobile)
+            return
+
         payload = {
             "user": SMS_USER,
             "password": SMS_PASS,
@@ -56,8 +66,13 @@ def send_sms(message, mobile):
             "text": message,
             "route": "1"
         }
-        r= requests.get(SMS_API_URL, params=payload, timeout=10)
+
+        r = requests.get(SMS_API_URL, params=payload, timeout=10)
         print("📱 SMS API RESPONSE:", r.text)
+
+        # 🔍 Success / Failure check
+        if "success" not in r.text.lower():
+            print("❌ SMS FAILED for:", mobile)
 
     except Exception as e:
         print("SMS Error:", e)
@@ -129,8 +144,12 @@ def check_device_online_offline():
     conn = pymysql.connect(**db_config)
     cursor = conn.cursor()
 
-    now = datetime.now()
-    five_min_ago = now - timedelta(minutes=5)
+    # now = datetime.now()
+    # five_min_ago = now - timedelta(minutes=5)
+    cursor.execute("SELECT NOW() as db_now")
+    db_now = cursor.fetchone()["db_now"]
+    five_min_ago = db_now - timedelta(minutes=5)
+
 
     # All devices
     cursor.execute("""SELECT DEVICE_ID, DEVICE_NAME, ORGANIZATION_ID, CENTRE_ID
@@ -156,10 +175,16 @@ def check_device_online_offline():
 
         if not last:
             continue
-
-        last_time = datetime.strptime(
-            str(last["last_time"]), "%Y-%m-%d %H:%M:%S.%f"
-        )
+ 
+        try:
+           last_time = datetime.strptime(
+               str(last["last_time"]), "%Y-%m-%d %H:%M:%S.%f"
+            )
+           
+        except ValueError:
+            last_time = datetime.strptime(
+                str(last["last_time"]), "%Y-%m-%d %H:%M:%S"
+            )
 
         is_online = last_time >= five_min_ago
         print("🕒 Last Reading Time:", last_time)
@@ -226,8 +251,8 @@ def check_device_online_offline():
             cursor.execute("""
                 INSERT INTO device_status_alarm_log
                 (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME)
-                VALUES (%s, 1, 1, CURDATE(), CURTIME())
-            """, (device_id,))
+                VALUES (%s, %s, 1, CURDATE(), CURTIME())
+            """, (device_id, 1))
             conn.commit()
 
         # ================= ONLINE =================
@@ -252,8 +277,8 @@ def check_device_online_offline():
             cursor.execute("""
                 INSERT INTO device_status_alarm_log
                 (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME)
-                VALUES (%s, 1, 0, CURDATE(), CURTIME())
-            """, (device_id,))
+                VALUES (%s, %s, 0, CURDATE(), CURTIME())
+            """, (device_id, 0))
             conn.commit()
 
     conn.close()
