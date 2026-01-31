@@ -37,7 +37,7 @@ SENDER_ID = "FRTLLP"
 def build_message(ntf_typ, devnm):
     messages = {
         3: f"WARNING!! The {devnm} is offline. Please take necessary action- Regards Fertisense LLP",
-        5: f"INFO!! The device {devnm} is back online. No action is required - Regards Fertisense LLP",
+        # 5: f"INFO!! The device {devnm} is back online. No action is required - Regards Fertisense LLP",
     }
     return messages.get(ntf_typ, f"Alert for {devnm} - Regards Fertisense LLP")
 
@@ -311,81 +311,81 @@ def check_device_online_offline():
             conn.commit()
 
         # ================= ONLINE =================
-        elif is_online and prev_is_active == 1:
-        # elif is_online:
-            sms_sent = False
-            email_sent = False
+        # elif is_online and prev_is_active == 1:
+        # # elif is_online:
+        #     sms_sent = False
+        #     email_sent = False
 
-            cursor.execute("""
-                UPDATE device_status_alarm_log
-                SET IS_ACTIVE = 0
-                WHERE DEVICE_ID = %s AND IS_ACTIVE = 1
-            """, (device_id,))
+        #     cursor.execute("""
+        #         UPDATE device_status_alarm_log
+        #         SET IS_ACTIVE = 0
+        #         WHERE DEVICE_ID = %s AND IS_ACTIVE = 1
+        #     """, (device_id,))
 
-            # msg = f"INFO!! The {device_name} is back online. No action is required - Regards Fertisense LLP"
-            msg = build_message(5, device_name)
+        #     # msg = f"INFO!! The {device_name} is back online. No action is required - Regards Fertisense LLP"
+        #     msg = build_message(5, device_name)
 
 
 
-            phones = []
-            emails = []
+        #     phones = []
+        #     emails = []
 
-            for user in users:
-                if user["SEND_SMS"] == 1 and user["PHONE"]:
-                    phones.append(user["PHONE"])
-                    # for num in str(user["PHONE"]).split(","):
-                    #     if send_sms(msg, num):
-                    #         sms_sent = True
+        #     for user in users:
+        #         if user["SEND_SMS"] == 1 and user["PHONE"]:
+        #             phones.append(user["PHONE"])
+        #             # for num in str(user["PHONE"]).split(","):
+        #             #     if send_sms(msg, num):
+        #             #         sms_sent = True
                 
-                if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
-                     emails.append(user["EMAIL"])
+        #         if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
+        #              emails.append(user["EMAIL"])
 
-            # 🔑 FLATTEN + DEDUPE
-            flat_phones = []
-            for p in phones:
-                if p:
-                   for part in p.split(","):
-                       num = part.strip()
-                       if num:
-                          flat_phones.append(num)
+        #     # 🔑 FLATTEN + DEDUPE
+        #     flat_phones = []
+        #     for p in phones:
+        #         if p:
+        #            for part in p.split(","):
+        #                num = part.strip()
+        #                if num:
+        #                   flat_phones.append(num)
 
-            unique_phones = list(set(flat_phones))
-            print("Unique phone numbers:", unique_phones)
-
-            
-            # 3️⃣ FLATTEN + DEDUPE EMAILS
-            unique_emails = list(set([e.strip() for e in emails if e.strip()]))
-            print("📧 Unique emails:", unique_emails)
+        #     unique_phones = list(set(flat_phones))
+        #     print("Unique phone numbers:", unique_phones)
 
             
-            # 4️⃣ SEND SMS
-            sms_sent = False
-            for phone in unique_phones:
-                if send_sms(msg, phone):
-                    sms_sent = True
+        #     # 3️⃣ FLATTEN + DEDUPE EMAILS
+        #     unique_emails = list(set([e.strip() for e in emails if e.strip()]))
+        #     print("📧 Unique emails:", unique_emails)
 
-            # 5️⃣ SEND EMAIL
-            email_sent = False
-            for email in unique_emails:
-                send_email("Device Online Info", msg, email)
-                email_sent = True
+            
+        #     # 4️⃣ SEND SMS
+        #     sms_sent = False
+        #     for phone in unique_phones:
+        #         if send_sms(msg, phone):
+        #             sms_sent = True
 
-            cursor.execute("""
-                INSERT INTO device_status_alarm_log
-                (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME, SMS_DATE, SMS_TIME, EMAIL_DATE, EMAIL_TIME)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                device_id,
-                0,
-                0,
-                now.date(),
-                now.time(),
-                now.date() if sms_sent else None,
-                now.time() if sms_sent else None,
-                now.date() if email_sent else None,
-                now.time() if email_sent else None
-            ))
-            conn.commit()
+        #     # 5️⃣ SEND EMAIL
+        #     email_sent = False
+        #     for email in unique_emails:
+        #         send_email("Device Online Info", msg, email)
+        #         email_sent = True
+
+        #     cursor.execute("""
+        #         INSERT INTO device_status_alarm_log
+        #         (DEVICE_ID, DEVICE_STATUS, IS_ACTIVE, CREATED_ON_DATE, CREATED_ON_TIME, SMS_DATE, SMS_TIME, EMAIL_DATE, EMAIL_TIME)
+        #         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        #     """, (
+        #         device_id,
+        #         0,
+        #         0,
+        #         now.date(),
+        #         now.time(),
+        #         now.date() if sms_sent else None,
+        #         now.time() if sms_sent else None,
+        #         now.date() if email_sent else None,
+        #         now.time() if email_sent else None
+        #     ))
+        #     conn.commit()
 
     conn.close()
 
