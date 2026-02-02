@@ -6,6 +6,31 @@ from datetime import datetime, timedelta
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 from twilio.rest import Client
+from datetime import time as dt_time, timedelta
+
+def safe_time(t):
+    """
+    Converts MySQL TIME / timedelta / datetime.time safely to datetime.time
+    """
+    if t is None:
+        return dt_time(0, 0, 0)
+
+    if isinstance(t, dt_time):
+        return t
+
+    if isinstance(t, timedelta):
+        total_seconds = int(t.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        return dt_time(hours % 24, minutes, seconds)
+
+    # fallback
+    try:
+        return t.time()
+    except Exception:
+        return dt_time(0, 0, 0)
+
 
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -391,8 +416,12 @@ def check_device_online_offline():
             if alarm and alarm["SMS_DATE"]:
 
                 first_sms_dt = IST.localize(
-                    datetime.combine(alarm["SMS_DATE"], alarm["SMS_TIME"])
+                    datetime.combine(
+                        alarm["SMS_DATE"],
+                        safe_time(alarm["SMS_TIME"])
+                    )
                 )
+
                 
 
                 elapsed = (now - first_sms_dt).total_seconds()
