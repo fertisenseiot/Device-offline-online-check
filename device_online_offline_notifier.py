@@ -5,6 +5,8 @@ import pytz
 from datetime import datetime, timedelta
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
+from twilio.rest import Client
+
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -49,6 +51,17 @@ BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 print("🔑 BREVO_API_KEY FOUND:", bool(BREVO_API_KEY))
 BREVO_SENDER_EMAIL = "fertisenseiot@gmail.com"   # VERIFIED
 BREVO_SENDER_NAME = "Fertisense LLP"
+
+
+# =====================================================
+# SMS CONFIG (Universal SMS)
+# =====================================================
+TWILIO_SID = os.getenv("TWILIO_SID")
+TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
+TWILIO_NUMBER = os.getenv("TWILIO_NUMBER")
+
+twilio = Client(TWILIO_SID, TWILIO_TOKEN)
+
 
 # =====================================================
 # SMS FUNCTION
@@ -127,6 +140,49 @@ def send_email(subject, message, to_email):
 
     except ApiException as e:
         print("Email Error:", e)
+
+# =====================================================
+# TWILLIO CALL SPEC
+# =====================================================
+def normalize_phone(num):
+    num = str(num).strip()
+    if num.startswith("+"):
+        return num
+    return "+91" + num
+
+
+def make_robo_call(phone, message):
+    try:
+        call = twilio.calls.create(
+            to=phone,
+            from_=TWILIO_NUMBER,
+            twiml=f"<Response><Say voice='alice' language='en-IN'>{message}</Say></Response>",
+            timeout=60,
+            status_callback="https://fertisense-iot-production.up.railway.app/twilio/call-status/",
+            status_callback_event=["initiated","answered","completed","busy","no-answer","failed"]
+        )
+        return call.sid
+    except Exception as e:
+        print("❌ Call failed:", e)
+        return None
+
+def get_call_count(cursor, alarm_id, phone):
+    cursor.execute("""
+        SELECT COUNT(*) cnt
+        FROM iot_api_devicealarmcalllog
+        WHERE ALARM_ID=%s AND PHONE_NUM=%s
+          AND CALL_STATUS IN (0,2,3)
+    """, (alarm_id, phone))
+    return cursor.fetchone()["cnt"]
+
+
+def is_alarm_answered(cursor, alarm_id):
+    cursor.execute("""
+        SELECT 1 FROM iot_api_devicealarmcalllog
+        WHERE ALARM_ID=%s AND CALL_STATUS=1
+        LIMIT 1
+    """, (alarm_id,))
+    return cursor.fetchone() is not None
 
 # =====================================================
 # FETCH USERS FOR ORG + CENTRE
@@ -321,6 +377,96 @@ def check_device_online_offline():
             ))
             conn.commit()
 
+            # ================= ROBO CALL AFTER 5 MIN =================
+
+            cursor.execute("""
+                SELECT DEVICE_STATUS_ALARM_ID, SMS_DATE, SMS_TIME
+                FROM device_status_alarm_log
+                WHERE DEVICE_ID=%s AND IS_ACTIVE=1
+                ORDER BY DEVICE_STATUS_ALARM_ID DESC
+                LIMIT 1
+            """, (device_id,))
+            alarm = cursor.fetchone()
+
+            if alarm and alarm["SMS_DATE"]:
+
+                first_sms_dt = IST.localize(
+                    datetime.combine(alarm["SMS_DATE"], alarm["SMS_TIME"])
+                )
+                
+
+                elapsed = (now - first_sms_dt).total_seconds()
+
+                if elapsed >= 300:   # ⏱️ 5 minutes
+
+                    if is_alarm_answered(cursor, alarm["DEVICE_STATUS_ALARM_ID"]):
+                        print("🔕 Alarm already acknowledged")
+                        continue
+
+                    for phone in unique_phones:
+                        phone = normalize_phone(phone)
+                        attempts = get_call_count(
+                            cursor,
+                            alarm["DEVICE_STATUS_ALARM_ID"],
+                            phone
+                        )
+
+                        if attempts >= 3:
+                              continue
+
+                        # voice_msg = (
+                        #     f"WARNING! Device {device_name} is OFFLINE. "
+                        #     "Immediate attention required."
+                        # )
+
+                        call_sid = make_robo_call(phone, msg)
+
+                        if call_sid:
+                           cursor.execute("""
+                              INSERT INTO iot_api_devicealarmcalllog
+                              (ALARM_ID, DEVICE_ID, PHONE_NUM,
+                               CALL_DATE, CALL_TIME, CALL_SID, CALL_STATUS)
+                                VALUES (%s,%s,%s,%s,%s,%s,0)
+                        """, (
+                             alarm["DEVICE_STATUS_ALARM_ID"],
+                             device_id,
+                             phone,
+                             now.date(),
+                             now.time(),
+                             call_sid
+                        ))
+                        conn.commit()
+                        break   # 🔥 sirf EK call per cron
+
+
+            # ================= SECOND NOTIFICATION =================
+            elapsed_hours = (now - first_sms_dt).total_seconds() / 3600
+
+            if elapsed_hours >= 6:
+
+                # 📩 SMS (same msg)
+                for phone in unique_phones:
+                    send_sms(msg, phone)
+
+                # 📧 EMAIL (same msg)
+                for email in unique_emails:
+                    send_email(
+                        "2nd Offline Alert",
+                        msg,
+                        email
+                    )
+
+                cursor.execute("""
+                    UPDATE device_status_alarm_log
+                    SET EMAIL_DATE=%s, EMAIL_TIME=%s
+                    WHERE DEVICE_STATUS_ALARM_ID=%s
+                """, (now.date(), now.time(), alarm["DEVICE_STATUS_ALARM_ID"]))
+
+                conn.commit()
+
+                print("✅ Second notification sent (SMS + Email only)")
+
+
         # ================= ONLINE =================
         # elif is_online and prev_is_active == 1:
         # # elif is_online:
@@ -398,7 +544,8 @@ def check_device_online_offline():
         #     ))
         #     conn.commit()
 
-    conn.close()
+    # conn.close()
+
 
 # =====================================================
 # ENTRY POINT
