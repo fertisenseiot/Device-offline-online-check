@@ -75,6 +75,17 @@ def send_sms(message, mobile):
         print("❌ SMS Error:", e)
         return False
 
+    # for sending multiple emails 
+def extract_unique_emails(email_list):
+    result = set()
+    for e in email_list:
+        if e:
+            parts = e.split(",")
+            for p in parts:
+                p = p.strip()
+                if p:
+                    result.add(p)
+    return list(result)
 
 
 # =====================================================
@@ -273,7 +284,7 @@ def check_device_online_offline():
 
             
             # 3️⃣ FLATTEN + DEDUPE EMAILS
-            unique_emails = list(set([e.strip() for e in emails if e.strip()]))
+            unique_emails = extract_unique_emails(emails)
             print("📧 Unique emails:", unique_emails)
 
             
