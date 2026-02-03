@@ -481,7 +481,7 @@ def check_device_online_offline():
                               INSERT INTO iot_api_devicealarmcalllog
                               (DEVICE_ID, DEVICE_STATUS_ALARM_ID, PHONE_NUM,
                                CALL_DATE, CALL_TIME, CALL_SID, SMS_CALL_FLAG, CALL_STATUS, ORGANIZATION_ID, CENTRE_ID)
-                                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         """, (
                              device_id,
                              alarm["DEVICE_STATUS_ALARM_ID"],
