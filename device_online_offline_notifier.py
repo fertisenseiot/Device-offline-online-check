@@ -191,22 +191,24 @@ def make_robo_call(phone, message):
         print("❌ Call failed:", e)
         return None
 
-def get_call_count(cursor, alarm_id, phone):
+def get_call_count(cursor, device_status_alarm_id, phone):
     cursor.execute("""
         SELECT COUNT(*) cnt
         FROM iot_api_devicealarmcalllog
-        WHERE ALARM_ID=%s AND PHONE_NUM=%s
+        WHERE DEVICE_STATUS_ALARM_ID=%s 
+          AND PHONE_NUM=%s
           AND CALL_STATUS IN (0,2,3)
-    """, (alarm_id, phone))
+    """, (device_status_alarm_id, phone))
     return cursor.fetchone()["cnt"]
 
 
-def is_alarm_answered(cursor, alarm_id):
+def is_alarm_answered(cursor, device_status_alarm_id):
     cursor.execute("""
         SELECT 1 FROM iot_api_devicealarmcalllog
-        WHERE ALARM_ID=%s AND CALL_STATUS=1
+        WHERE DEVICE_STATUS_ALARM_ID=%s 
+            AND CALL_STATUS=1
         LIMIT 1
-    """, (alarm_id,))
+    """, (device_status_alarm_id,))
     return cursor.fetchone() is not None
 
 # =====================================================
@@ -403,6 +405,30 @@ def check_device_online_offline():
             conn.commit()
 
             # ================= ROBO CALL AFTER 5 MIN =================
+        if not is_online and prev_is_active == 1:
+
+                    # 👇👇👇 YAHI ADD KARNA HAI 👇👇👇
+            msg = build_message(3, device_name)
+
+            phones = []
+            emails = []
+
+            for user in users:
+                if user["SEND_SMS"] == 1 and user["PHONE"]:
+                    phones.append(user["PHONE"])
+                if user["SEND_EMAIL"] == 1 and user["EMAIL"]:
+                    emails.append(user["EMAIL"])
+
+            flat_phones = []
+            for p in phones:
+                for part in p.split(","):
+                    part = part.strip()
+                    if part:
+                        flat_phones.append(part)
+
+            unique_phones = list(set(flat_phones))
+            unique_emails = extract_unique_emails(emails)
+            # 👆👆👆 YAHAN TAK 👆👆👆
 
             cursor.execute("""
                 SELECT DEVICE_STATUS_ALARM_ID, SMS_DATE, SMS_TIME
@@ -453,7 +479,7 @@ def check_device_online_offline():
                         if call_sid:
                            cursor.execute("""
                               INSERT INTO iot_api_devicealarmcalllog
-                              (ALARM_ID, DEVICE_ID, PHONE_NUM,
+                              (DEVICE_STATUS_ALARM_ID, DEVICE_ID, PHONE_NUM,
                                CALL_DATE, CALL_TIME, CALL_SID, CALL_STATUS)
                                 VALUES (%s,%s,%s,%s,%s,%s,0)
                         """, (
