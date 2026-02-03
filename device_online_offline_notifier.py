@@ -479,16 +479,18 @@ def check_device_online_offline():
                         if call_sid:
                            cursor.execute("""
                               INSERT INTO iot_api_devicealarmcalllog
-                              (DEVICE_STATUS_ALARM_ID, DEVICE_ID, PHONE_NUM,
-                               CALL_DATE, CALL_TIME, CALL_SID, CALL_STATUS)
-                                VALUES (%s,%s,%s,%s,%s,%s,0)
+                              (DEVICE_ID, DEVICE_STATUS_ALARM_ID, PHONE_NUM,
+                               CALL_DATE, CALL_TIME, CALL_SID, SMS_CALL_FLAG, CALL_STATUS)
+                                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                         """, (
-                             alarm["DEVICE_STATUS_ALARM_ID"],
                              device_id,
+                             alarm["DEVICE_STATUS_ALARM_ID"],
                              phone,
                              now.date(),
                              now.time(),
-                             call_sid
+                             call_sid,
+                             1,  # 👈 SMS_CALL_FLAG (1 = call via SMS/robo)
+                             0   # 👈 CALL_STATUS = PENDING
                         ))
                         conn.commit()
                         break   # 🔥 sirf EK call per cron
