@@ -243,7 +243,7 @@ def check_device_online_offline():
     # cursor.execute("SELECT NOW() as db_now")
     # db_now = cursor.fetchone()["db_now"]
     now = datetime.now(IST)
-    five_min_ago = now - timedelta(minutes=5)
+    ten_min_ago = now - timedelta(minutes=10)
 
 
     # All devices
@@ -284,9 +284,9 @@ def check_device_online_offline():
         if last_time.tzinfo is None:
            last_time = IST.localize(last_time)
 
-        is_online = last_time >= five_min_ago
+        is_online = last_time >= ten_min_ago
         print("🕒 Last Reading Time:", last_time)
-        print("⏱ 5 Min Threshold:", five_min_ago)
+        print("⏱ 10 Min Threshold:", ten_min_ago)
         print("📡 Is Online:", is_online)
 
         # Device org + centre
