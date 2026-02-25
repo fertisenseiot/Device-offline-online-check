@@ -210,7 +210,22 @@ def is_alarm_answered(cursor, device_status_alarm_id):
         LIMIT 1
     """, (device_status_alarm_id,))
     return cursor.fetchone() is not None
+# ====================================================
+# ====================================================
+def has_active_subscription(cursor, device_id):
+    today = datetime.now().date()
 
+    cursor.execute("""
+        SELECT 1
+        FROM Subcription_History sh
+        WHERE sh.Device_ID = %s
+          AND sh.Subscription_ID = 1
+          AND sh.Subcription_End_date >= %s
+        ORDER BY sh.ID DESC
+        LIMIT 1
+    """, (device_id, today))
+
+    return cursor.fetchone() is not None
 # =====================================================
 # FETCH USERS FOR ORG + CENTRE
 # =====================================================
@@ -257,6 +272,11 @@ def check_device_online_offline():
         device_id = d["DEVICE_ID"]
 
         print("\n🔍 Checking DEVICE_ID:", device_id)
+
+        # 🔒 SUBSCRIPTION CHECK (YAHI ADD KARNA HAI)
+        if not has_active_subscription(cursor, device_id):
+            print(f"⛔ Subscription expired for device {device_id}. Skipping.")
+            continue
 
         # Last reading
         cursor.execute("""
@@ -499,31 +519,31 @@ def check_device_online_offline():
 
 
             # ================= SECOND NOTIFICATION =================
-            elapsed_hours = (now - first_sms_dt).total_seconds() / 3600
+            # elapsed_hours = (now - first_sms_dt).total_seconds() / 3600
 
-            if elapsed_hours >= 6:
+            # if elapsed_hours >= 6 and alarm["EMAIL_DATE"] is None:
 
-                # 📩 SMS (same msg)
-                for phone in unique_phones:
-                    send_sms(msg, phone)
+            #     # 📩 SMS (same msg)
+            #     for phone in unique_phones:
+            #         send_sms(msg, phone)
 
-                # 📧 EMAIL (same msg)
-                for email in unique_emails:
-                    send_email(
-                        "2nd Offline Alert",
-                        msg,
-                        email
-                    )
+            #     # 📧 EMAIL (same msg)
+            #     for email in unique_emails:
+            #         send_email(
+            #             "2nd Offline Alert",
+            #             msg,
+            #             email
+            #         )
 
-                cursor.execute("""
-                    UPDATE device_status_alarm_log
-                    SET EMAIL_DATE=%s, EMAIL_TIME=%s
-                    WHERE DEVICE_STATUS_ALARM_ID=%s
-                """, (now.date(), now.time(), alarm["DEVICE_STATUS_ALARM_ID"]))
+            #     cursor.execute("""
+            #         UPDATE device_status_alarm_log
+            #         SET EMAIL_DATE=%s, EMAIL_TIME=%s
+            #         WHERE DEVICE_STATUS_ALARM_ID=%s
+            #     """, (now.date(), now.time(), alarm["DEVICE_STATUS_ALARM_ID"]))
 
-                conn.commit()
+            #     conn.commit()
 
-                print("✅ Second notification sent (SMS + Email only)")
+            #     print("✅ Second notification sent (SMS + Email only)")
 
 
         # ================= ONLINE =================
