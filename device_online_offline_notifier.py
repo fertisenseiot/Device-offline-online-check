@@ -294,7 +294,7 @@ def check_device_online_offline():
         """, (device_id,))
         last = cursor.fetchone()
 
-        if not last:
+        if not last or not last["last_time"]:
             continue
          
         try:
