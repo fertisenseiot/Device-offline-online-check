@@ -271,20 +271,26 @@ def check_device_online_offline():
     for d in devices:
         device_id = d["DEVICE_ID"]
 
-        print("\n🔍 Checking DEVICE_ID:", device_id)
+        # 🔴 ADD THIS (MOST IMPORTANT)
+        cursor.execute("""
+            SELECT IS_ACTIVE
+            FROM device_status_alarm_log
+            WHERE DEVICE_ID = %s
+            ORDER BY DEVICE_STATUS_ALARM_ID DESC
+            LIMIT 1
+        """, (device_id,))
 
-        # 🔒 SUBSCRIPTION CHECK (YAHI ADD KARNA HAI)
-        if not has_active_subscription(cursor, device_id):
-            print(f"⛔ Subscription expired for device {device_id}. Skipping.")
-            continue
+        prev = cursor.fetchone()
+        prev_is_active = prev["IS_ACTIVE"] if prev else 0
+
+        # ✅ अगर already offline hai → SKIP
+        # 🔥 SMART HANDLING
 
         # Last reading
         cursor.execute("""
-            SELECT CONCAT(READING_DATE,' ',READING_TIME) AS last_time
+            SELECT MAX(CONCAT(READING_DATE,' ',READING_TIME)) AS last_time
             FROM device_reading_log
             WHERE DEVICE_ID = %s
-            ORDER BY READING_DATE DESC, READING_TIME DESC
-            LIMIT 1
         """, (device_id,))
         last = cursor.fetchone()
 
@@ -305,9 +311,11 @@ def check_device_online_offline():
            last_time = IST.localize(last_time)
 
         is_online = last_time >= ten_min_ago
-        print("🕒 Last Reading Time:", last_time)
-        print("⏱ 10 Min Threshold:", ten_min_ago)
-        print("📡 Is Online:", is_online)
+        if is_online:
+            continue
+        # print("🕒 Last Reading Time:", last_time)
+        # print("⏱ 10 Min Threshold:", ten_min_ago)
+        # print("📡 Is Online:", is_online)
 
         # Device org + centre
         # cursor.execute("""
@@ -329,19 +337,19 @@ def check_device_online_offline():
 
 
         # Previous status
-        cursor.execute("""
-           SELECT IS_ACTIVE
-           FROM device_status_alarm_log
-           WHERE DEVICE_ID = %s
-           ORDER BY DEVICE_STATUS_ALARM_ID DESC
-           LIMIT 1
-        """, (device_id,))
+        # cursor.execute("""
+        #    SELECT IS_ACTIVE
+        #    FROM device_status_alarm_log
+        #    WHERE DEVICE_ID = %s
+        #    ORDER BY DEVICE_STATUS_ALARM_ID DESC
+        #    LIMIT 1
+        # """, (device_id,))
         prev = cursor.fetchone()
         prev_is_active = prev["IS_ACTIVE"] if prev else 0
-        print("📄 Previous Status:", prev_is_active)
+        # print("📄 Previous Status:", prev_is_active)
 
         users = get_alert_users(cursor, organization_id, centre_id)
-        print("👥 Users Found:", len(users))
+        # print("👥 Users Found:", len(users))
 
 
 
@@ -383,12 +391,12 @@ def check_device_online_offline():
                           flat_phones.append(num)
 
             unique_phones = list(set(flat_phones))
-            print("Unique phone numbers:", unique_phones)
+            # print("Unique phone numbers:", unique_phones)
 
             
             # 3️⃣ FLATTEN + DEDUPE EMAILS
             unique_emails = extract_unique_emails(emails)
-            print("📧 Unique emails:", unique_emails)
+            # print("📧 Unique emails:", unique_emails)
 
             
             # 4️⃣ SEND SMS
