@@ -344,8 +344,8 @@ def check_device_online_offline():
         #    ORDER BY DEVICE_STATUS_ALARM_ID DESC
         #    LIMIT 1
         # """, (device_id,))
-        prev = cursor.fetchone()
-        prev_is_active = prev["IS_ACTIVE"] if prev else 0
+        # prev = cursor.fetchone()
+        # prev_is_active = prev["IS_ACTIVE"] if prev else 0
         # print("📄 Previous Status:", prev_is_active)
 
         users = get_alert_users(cursor, organization_id, centre_id)
