@@ -7,7 +7,6 @@ import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 from twilio.rest import Client
 from datetime import time as dt_time, timedelta
-import time
 
 def safe_time(t):
     """
@@ -43,15 +42,12 @@ print("🚀 Device Online/Offline Script Started")
 # DATABASE CONFIG
 # =====================================================
 db_config = {
-    "host": "switchyard.proxy.rlwy.net",  # Change to Private Host (e.g., mysql.railway.internal) if hosted together
+    "host": "switchyard.proxy.rlwy.net",
     "user": "root",
-    "port": 28085,                         # Private Port is usually 3306
+    "port": 28085,
     "password": "NOtYUNawwodSrBfGubHhwKaFtWyGXQct",
     "database": "railway",
-    "cursorclass": pymysql.cursors.DictCursor,
-    "connect_timeout": 10,
-    "read_timeout": 30,
-    "write_timeout": 30
+    "cursorclass": pymysql.cursors.DictCursor
 }
 
 # =====================================================
@@ -253,38 +249,14 @@ def get_alert_users(cursor, organization_id, centre_id):
 # =====================================================
 # CORE LOGIC
 # =====================================================
-# def check_device_online_offline():
-#     conn = pymysql.connect(**db_config)
-#     cursor = conn.cursor()
+def check_device_online_offline():
+    conn = pymysql.connect(**db_config)
+    cursor = conn.cursor()
 
     # now = datetime.now()
     # five_min_ago = now - timedelta(minutes=5)
     # cursor.execute("SELECT NOW() as db_now")
     # db_now = cursor.fetchone()["db_now"]
-    # now = datetime.now(IST)
-    # ten_min_ago = now - timedelta(minutes=10)
-
-# =====================================================
-# CORE LOGIC
-# =====================================================
-def check_device_online_offline():
-    conn = None
-    for attempt in range(5):  # 5 Attempts for stability
-        try:
-            conn = pymysql.connect(**db_config)
-            print("✅ Database connected successfully!")
-            break
-        except pymysql.OperationalError as e:
-            print(f"⚠️ Connection attempt {attempt + 1} failed: {e}. Retrying in 5 seconds...")
-            time.sleep(5)
-
-    if not conn:
-        print("❌ Could not connect to MySQL server after retries. Exiting.")
-        return
-
-    cursor = conn.cursor()
-
-    # Iske neeche aapka saara logic bilkul SAME rahega...
     now = datetime.now(IST)
     ten_min_ago = now - timedelta(minutes=10)
 
