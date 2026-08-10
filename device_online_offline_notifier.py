@@ -42,12 +42,15 @@ print("🚀 Device Online/Offline Script Started")
 # DATABASE CONFIG
 # =====================================================
 db_config = {
-    "host": "switchyard.proxy.rlwy.net",
+    "host": "switchyard.proxy.rlwy.net",  # Change to Private Host (e.g., mysql.railway.internal) if hosted together
     "user": "root",
-    "port": 28085,
+    "port": 28085,                         # Private Port is usually 3306
     "password": "NOtYUNawwodSrBfGubHhwKaFtWyGXQct",
     "database": "railway",
-    "cursorclass": pymysql.cursors.DictCursor
+    "cursorclass": pymysql.cursors.DictCursor,
+    "connect_timeout": 10,
+    "read_timeout": 30,
+    "write_timeout": 30
 }
 
 # =====================================================
@@ -260,25 +263,22 @@ def get_alert_users(cursor, organization_id, centre_id):
     # now = datetime.now(IST)
     # ten_min_ago = now - timedelta(minutes=10)
 
-import time  # <--- Isko file ke start (top) mein baki imports ke sath add kar lena
-
 # =====================================================
 # CORE LOGIC
 # =====================================================
 def check_device_online_offline():
-    # 🔌 DB Connection with Retry Logic
     conn = None
-    for attempt in range(3):
+    for attempt in range(5):  # 5 Attempts for stability
         try:
             conn = pymysql.connect(**db_config)
             print("✅ Database connected successfully!")
             break
         except pymysql.OperationalError as e:
-            print(f"⚠️ Connection attempt {attempt + 1} failed: {e}. Retrying in 3 seconds...")
-            time.sleep(3)
+            print(f"⚠️ Connection attempt {attempt + 1} failed: {e}. Retrying in 5 seconds...")
+            time.sleep(5)
 
     if not conn:
-        print("❌ Could not connect to MySQL server after 3 attempts. Exiting.")
+        print("❌ Could not connect to MySQL server after retries. Exiting.")
         return
 
     cursor = conn.cursor()
