@@ -249,14 +249,41 @@ def get_alert_users(cursor, organization_id, centre_id):
 # =====================================================
 # CORE LOGIC
 # =====================================================
-def check_device_online_offline():
-    conn = pymysql.connect(**db_config)
-    cursor = conn.cursor()
+# def check_device_online_offline():
+#     conn = pymysql.connect(**db_config)
+#     cursor = conn.cursor()
 
     # now = datetime.now()
     # five_min_ago = now - timedelta(minutes=5)
     # cursor.execute("SELECT NOW() as db_now")
     # db_now = cursor.fetchone()["db_now"]
+    # now = datetime.now(IST)
+    # ten_min_ago = now - timedelta(minutes=10)
+
+import time  # <--- Isko file ke start (top) mein baki imports ke sath add kar lena
+
+# =====================================================
+# CORE LOGIC
+# =====================================================
+def check_device_online_offline():
+    # 🔌 DB Connection with Retry Logic
+    conn = None
+    for attempt in range(3):
+        try:
+            conn = pymysql.connect(**db_config)
+            print("✅ Database connected successfully!")
+            break
+        except pymysql.OperationalError as e:
+            print(f"⚠️ Connection attempt {attempt + 1} failed: {e}. Retrying in 3 seconds...")
+            time.sleep(3)
+
+    if not conn:
+        print("❌ Could not connect to MySQL server after 3 attempts. Exiting.")
+        return
+
+    cursor = conn.cursor()
+
+    # Iske neeche aapka saara logic bilkul SAME rahega...
     now = datetime.now(IST)
     ten_min_ago = now - timedelta(minutes=10)
 
