@@ -271,6 +271,22 @@ def check_device_online_offline():
     for d in devices:
         device_id = d["DEVICE_ID"]
 
+        # 👇 YAHAN PE EXACT PASTE KARNA HAI 👇
+        today = datetime.now().date()
+        cursor.execute("""
+            SELECT 1 
+            FROM Subcription_History 
+            WHERE Device_ID = %s 
+              AND Subscription_ID = 1 
+              AND Subscription_Start_date <= %s 
+              AND (Subcription_End_date IS NULL OR Subcription_End_date >= %s)
+            LIMIT 1
+        """, (device_id, today, today))
+        
+        if not cursor.fetchone():
+            continue  # Agar Subscription_ID = 1 nahi hai toh offline check & alert skip ho jayega
+        # 👆 YAHAN TAK PASTE KARNA HAI 👆
+
         # 🔴 ADD THIS (MOST IMPORTANT)
         cursor.execute("""
             SELECT IS_ACTIVE
