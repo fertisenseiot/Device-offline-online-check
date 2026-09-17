@@ -242,6 +242,8 @@ def get_alert_users(cursor, organization_id, centre_id):
             ON l.USER_ID_id = u.USER_ID
         WHERE l.ORGANIZATION_ID_id = %s
           AND l.CENTRE_ID_id = %s
+          AND u.ROLE_ID IN (2, 3)   -- 🔥 FIX: Sirf Admins (2) aur Users (3) ko allow karo
+          AND (u.SEND_SMS = 1 OR u.SEND_EMAIL = 1) -- 🔥 FIX: Sirf unhe uthao jinki notification on ho
     """, (organization_id, centre_id))
 
     return cursor.fetchall()
